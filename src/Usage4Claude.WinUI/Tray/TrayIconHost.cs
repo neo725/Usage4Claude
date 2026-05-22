@@ -77,7 +77,7 @@ internal sealed class TrayIconHost : IDisposable
     }
 
     private NotifyIconData CreateIconData() =>
-        CreateIconData(NotifyIconFlags.Message | NotifyIconFlags.Icon | NotifyIconFlags.Tip);
+        CreateIconData(NotifyIconFlags.Message | NotifyIconFlags.Icon | NotifyIconFlags.Tip | NotifyIconFlags.ShowTip);
 
     private NotifyIconData CreateIconData(NotifyIconFlags flags) =>
         new()
@@ -285,6 +285,7 @@ internal sealed class TrayIconHost : IDisposable
         Message = 0x1,
         Icon = 0x2,
         Tip = 0x4,
+        ShowTip = 0x80,
     }
 
     private enum NotifyIconMessage : uint
