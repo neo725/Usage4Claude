@@ -46,7 +46,7 @@ internal static class TrayQuotaIconRenderer
             }
         }
 
-        var colorBitmap = CreateBitmap(IconSize, IconSize, 1, 32, pixels);
+        var colorBitmap = CreateColorBitmap(pixels);
         var maskBitmap = CreateBitmap(IconSize, IconSize, 1, 1, new byte[IconSize * IconSize / 8]);
         if (colorBitmap == nint.Zero || maskBitmap == nint.Zero)
         {
@@ -84,6 +84,65 @@ internal static class TrayQuotaIconRenderer
     private static uint ToBgra(byte red, byte green, byte blue, byte alpha) =>
         (uint)(alpha << 24 | red << 16 | green << 8 | blue);
 
+    private static nint CreateColorBitmap(uint[] pixels)
+    {
+        var bitmapInfo = new BitmapInfo
+        {
+            Header = new BitmapInfoHeader
+            {
+                Size = (uint)Marshal.SizeOf<BitmapInfoHeader>(),
+                Width = IconSize,
+                Height = -IconSize,
+                Planes = 1,
+                BitsPerPixel = 32,
+                Compression = BitmapCompression.Rgb,
+                ImageSize = IconSize * IconSize * 4,
+            },
+        };
+
+        var bitmap = CreateDIBSection(
+            nint.Zero,
+            ref bitmapInfo,
+            DibColorMode.RgbColors,
+            out var bitmapBits,
+            nint.Zero,
+            0);
+        if (bitmap == nint.Zero || bitmapBits == nint.Zero)
+        {
+            return nint.Zero;
+        }
+
+        Marshal.Copy(
+            pixels.Select(unchecked(value => (int)value)).ToArray(),
+            0,
+            bitmapBits,
+            pixels.Length);
+        return bitmap;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfo
+    {
+        public BitmapInfoHeader Header;
+        public uint Colors;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfoHeader
+    {
+        public uint Size;
+        public int Width;
+        public int Height;
+        public ushort Planes;
+        public ushort BitsPerPixel;
+        public BitmapCompression Compression;
+        public int ImageSize;
+        public int XpixelsPerMeter;
+        public int YpixelsPerMeter;
+        public uint ColorsUsed;
+        public uint ColorsImportant;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct IconInfo
     {
@@ -96,13 +155,15 @@ internal static class TrayQuotaIconRenderer
         public nint ColorBitmap;
     }
 
-    [DllImport("gdi32.dll", SetLastError = true)]
-    private static extern nint CreateBitmap(
-        int width,
-        int height,
-        uint planes,
-        uint bitsPerPixel,
-        uint[] bits);
+    private enum BitmapCompression : uint
+    {
+        Rgb = 0,
+    }
+
+    private enum DibColorMode : uint
+    {
+        RgbColors = 0,
+    }
 
     [DllImport("gdi32.dll", SetLastError = true)]
     private static extern nint CreateBitmap(
@@ -111,6 +172,15 @@ internal static class TrayQuotaIconRenderer
         uint planes,
         uint bitsPerPixel,
         byte[] bits);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern nint CreateDIBSection(
+        nint deviceContext,
+        ref BitmapInfo bitmapInfo,
+        DibColorMode usage,
+        out nint bits,
+        nint section,
+        uint offset);
 
     [DllImport("gdi32.dll", SetLastError = true)]
     private static extern bool DeleteObject(nint handle);

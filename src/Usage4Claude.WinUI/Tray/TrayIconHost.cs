@@ -198,7 +198,17 @@ internal sealed class TrayIconHost : IDisposable
         _ownsIconHandle = ownsIconHandle;
 
         var icon = CreateIconData();
-        Shell_NotifyIcon(NotifyIconMessage.Modify, ref icon);
+        if (!Shell_NotifyIcon(NotifyIconMessage.Modify, ref icon))
+        {
+            _iconHandle = oldIconHandle;
+            _ownsIconHandle = oldIconOwned;
+            if (ownsIconHandle)
+            {
+                DestroyIcon(iconHandle);
+            }
+
+            return;
+        }
 
         if (oldIconOwned)
         {
