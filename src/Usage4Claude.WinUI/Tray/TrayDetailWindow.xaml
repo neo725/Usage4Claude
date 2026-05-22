@@ -35,7 +35,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="Claude" />
-                        <TextBlock x:Name="ClaudeEmptyText" Text="No usage snapshot yet" />
+                        <TextBlock x:Name="ClaudeEmptyText" Text="Not signed in" />
                         <StackPanel x:Name="ClaudeUsagePanel" Spacing="4" Visibility="Collapsed">
                             <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
@@ -72,7 +72,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="Codex" />
-                        <TextBlock x:Name="CodexEmptyText" Text="No usage snapshot yet" />
+                        <TextBlock x:Name="CodexEmptyText" Text="Not signed in" />
                         <StackPanel x:Name="CodexUsagePanel" Spacing="4" Visibility="Collapsed">
                             <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>

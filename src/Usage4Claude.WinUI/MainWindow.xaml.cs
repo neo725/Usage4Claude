@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly CodexUsageClient _codexClient;
     private readonly CredentialLockerProbe _credentialLocker = new();
     private readonly UsageStateStore _usageState = new();
+    private readonly ProviderSessionStateStore _sessionState = new();
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
@@ -51,7 +52,8 @@ public sealed partial class MainWindow : Window
             ShowProbeWindow,
             QuitFromTray);
         _usageState.Changed += UsageState_Changed;
-        _trayDetailWindow.UpdateUsage(_usageState.Current);
+        _sessionState.Changed += SessionState_Changed;
+        RefreshTraySurfaces();
         AppWindow.Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
     }
@@ -59,6 +61,7 @@ public sealed partial class MainWindow : Window
     private async void StartClaudeLogin_Click(object sender, RoutedEventArgs e)
     {
         _loginTarget = LoginTarget.Claude;
+        _sessionState.ActivateBrowser(ProviderKind.Claude);
         BrowserModeText.Text = "Claude login";
         SetStatus("Opening Claude", "Complete login in WebView2. Cookie capture starts after navigation.", InfoBarSeverity.Informational);
         await NavigateAsync("https://claude.ai/login");
@@ -67,6 +70,7 @@ public sealed partial class MainWindow : Window
     private async void StartCodexLogin_Click(object sender, RoutedEventArgs e)
     {
         _loginTarget = LoginTarget.Codex;
+        _sessionState.ActivateBrowser(ProviderKind.Codex);
         BrowserModeText.Text = "Codex login";
         SetStatus("Opening ChatGPT", "Complete login in WebView2. The probe will capture the session cookie.", InfoBarSeverity.Informational);
         await NavigateAsync("https://chatgpt.com/auth/login");
@@ -172,6 +176,7 @@ public sealed partial class MainWindow : Window
         await LoginWebView.CoreWebView2.Profile.ClearBrowsingDataAsync();
         _claudeSessionKey = null;
         _codexCookieHeader = null;
+        _sessionState.ClearBrowserSessions();
         ClaudeSessionKeyBox.Text = string.Empty;
         SetStatus("WebView data cleared", "Start a fresh browser login for the next probe.", InfoBarSeverity.Success);
     }
@@ -186,6 +191,7 @@ public sealed partial class MainWindow : Window
         }
 
         _credentialLocker.SaveClaudeSessionKey(sessionKey);
+        _sessionState.SetClaudeCredentialSession();
         SetStatus("Credential stored", "Credential Locker accepted the Claude session key probe value.", InfoBarSeverity.Success);
     }
 
@@ -199,6 +205,7 @@ public sealed partial class MainWindow : Window
         }
 
         _claudeSessionKey = sessionKey;
+        _sessionState.SetClaudeCredentialSession();
         ClaudeSessionKeyBox.Text = sessionKey;
         SetStatus("Credential loaded", "Credential Locker returned the Claude session key probe value.", InfoBarSeverity.Success);
     }
@@ -272,6 +279,7 @@ public sealed partial class MainWindow : Window
             if (sessionCookie is not null)
             {
                 _claudeSessionKey = sessionCookie.Value;
+                _sessionState.SetClaudeWebViewSession();
                 ClaudeSessionKeyBox.Text = sessionCookie.Value;
                 _cookieTimer.Stop();
                 SetStatus("Claude cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
@@ -288,6 +296,7 @@ public sealed partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(sessionToken))
             {
                 _codexCookieHeader = string.Join("; ", chatGptCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
+                _sessionState.SetCodexWebViewSession();
                 _cookieTimer.Stop();
                 SetStatus("Codex cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
                 await RefreshCapturedUsageAsync();
@@ -333,14 +342,18 @@ public sealed partial class MainWindow : Window
 
     private Task RefreshCapturedUsageAsync()
     {
-        if (_loginTarget == LoginTarget.None)
+        var activeBrowserProvider = _sessionState.Current.ActiveBrowserProvider;
+        if (activeBrowserProvider is null)
         {
             SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
             return Task.CompletedTask;
         }
 
-        return RunBrowserRefreshAsync(_loginTarget);
+        return RunBrowserRefreshAsync(activeBrowserProvider.Value);
     }
+
+    private Task RunBrowserRefreshAsync(ProviderKind provider) =>
+        RunBrowserRefreshAsync(provider == ProviderKind.Claude ? LoginTarget.Claude : LoginTarget.Codex);
 
     private async Task RunBrowserRefreshAsync(LoginTarget target)
     {
@@ -460,6 +473,7 @@ public sealed partial class MainWindow : Window
     {
         _cookieTimer.Stop();
         _usageState.Changed -= UsageState_Changed;
+        _sessionState.Changed -= SessionState_Changed;
         _trayDetailWindow.Close();
         _trayIconHost.Dispose();
         _httpClient.Dispose();
@@ -508,11 +522,16 @@ public sealed partial class MainWindow : Window
         RefreshTraySurfaces();
     }
 
+    private void SessionState_Changed(object? sender, ProviderSessionState state)
+    {
+        RefreshTraySurfaces();
+    }
+
     private void RefreshTraySurfaces()
     {
-        var state = _usageState.Current;
-        _trayDetailWindow.UpdateUsage(state);
-        _trayIconHost.UpdateUsage(state);
+        var usageState = _usageState.Current;
+        _trayDetailWindow.UpdateState(usageState, _sessionState.Current);
+        _trayIconHost.UpdateUsage(usageState);
     }
 
     private static string Usage4ClaudeIconPath =>

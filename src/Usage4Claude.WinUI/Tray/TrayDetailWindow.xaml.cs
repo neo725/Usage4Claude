@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Usage4Claude.Core.Usage;
+using Usage4Claude.WinUI.State;
 
 namespace Usage4Claude.WinUI.Tray;
 
@@ -55,22 +56,23 @@ public sealed partial class TrayDetailWindow : Window
         AppWindow.Hide();
     }
 
-    public void UpdateUsage(UsageState state)
+    internal void UpdateState(UsageState usageState, ProviderSessionState sessionState)
     {
-        UpdatedAtText.Text = state.UpdatedAt is null
+        UpdatedAtText.Text = usageState.UpdatedAt is null
             ? "Sign in and refresh usage"
-            : $"Updated {state.UpdatedAt.Value.ToLocalTime():t}";
+            : $"Updated {usageState.UpdatedAt.Value.ToLocalTime():t}";
 
-        UpdateClaude(state.Claude);
-        UpdateCodex(state.Codex);
+        UpdateClaude(usageState.Claude, sessionState.HasClaude);
+        UpdateCodex(usageState.Codex, sessionState.HasCodex);
     }
 
-    private void UpdateClaude(ClaudeUsageSnapshot? usage)
+    private void UpdateClaude(ClaudeUsageSnapshot? usage, bool hasSession)
     {
         ClaudeEmptyText.Visibility = usage is null ? Visibility.Visible : Visibility.Collapsed;
         ClaudeUsagePanel.Visibility = usage is null ? Visibility.Collapsed : Visibility.Visible;
         if (usage is null)
         {
+            ClaudeEmptyText.Text = hasSession ? "Waiting for refresh" : "Not signed in";
             return;
         }
 
@@ -80,12 +82,13 @@ public sealed partial class TrayDetailWindow : Window
         ClaudeSecondaryResetText.Text = FormatReset(usage.SevenDay);
     }
 
-    private void UpdateCodex(CodexUsageSnapshot? usage)
+    private void UpdateCodex(CodexUsageSnapshot? usage, bool hasSession)
     {
         CodexEmptyText.Visibility = usage is null ? Visibility.Visible : Visibility.Collapsed;
         CodexUsagePanel.Visibility = usage is null ? Visibility.Collapsed : Visibility.Visible;
         if (usage is null)
         {
+            CodexEmptyText.Text = hasSession ? "Waiting for refresh" : "Not signed in";
             return;
         }
 

@@ -82,6 +82,7 @@ real usage data out of that UI boundary:
 - The notification-area detail surface renders the latest snapshots and the tray icon follows the current primary quota signal.
 - Capturing a signed-in Claude or Codex browser session starts a browser-backed refresh, and the tray detail surface can refresh the current browser provider again.
 - Browser-backed fetch execution and provider refresh parsing now live in WinUI browser services instead of the probe window.
+- WinUI session state records WebView and Credential Locker provider availability so tray refresh selection and empty states do not depend only on the transient login target.
 
 Validated on May 22, 2026:
 
