@@ -52,7 +52,7 @@ Prototype secure local credential storage, notifications, launch at login, and M
 
 Implemented on May 22, 2026:
 
-- `Package.appxmanifest` declares app-notification activation and the `Usage4ClaudeStartup` startup task for the MSIX host.
+- `Package.appxmanifest` declares app-notification activation and the `Usage4ClaudeStartup` startup task for the MSIX host. Manifest extension executable names must stay explicit so the app-notification COM server matches the packaged WinUI process.
 - The probe surface can store and reload a Claude session key through Windows Credential Locker.
 - The probe surface can request a local Windows App SDK app notification.
 - The probe surface can request enablement for the packaged launch-at-login startup task and report the resulting state.

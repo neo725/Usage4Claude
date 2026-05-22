@@ -40,7 +40,7 @@
         </desktop:Extension>
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:ExeServer Executable="$targetnametoken$.exe"
+            <com:ExeServer Executable="Usage4Claude.WinUI.exe"
                            DisplayName="Usage4Claude"
                            Arguments="----AppNotificationActivated:">
               <com:Class Id="9c33d851-6a43-495b-83d5-748ac6c27cf4" />
@@ -48,7 +48,7 @@
           </com:ComServer>
         </com:Extension>
         <desktop:Extension Category="windows.startupTask"
-                           Executable="$targetnametoken$.exe"
+                           Executable="Usage4Claude.WinUI.exe"
                            EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask TaskId="Usage4ClaudeStartup"
                                Enabled="false"
