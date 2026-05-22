@@ -81,6 +81,7 @@ real usage data out of that UI boundary:
 - Successful Claude and Codex browser probes publish their snapshots into the WinUI state store.
 - The notification-area detail surface renders the latest snapshots and the tray icon follows the current primary quota signal.
 - Capturing a signed-in Claude or Codex browser session starts a browser-backed refresh, and the tray detail surface can refresh the current browser provider again.
+- Browser-backed fetch execution and provider refresh parsing now live in WinUI browser services instead of the probe window.
 
 Validated on May 22, 2026:
 

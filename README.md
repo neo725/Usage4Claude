@@ -43,6 +43,8 @@ being built out. It can currently:
   from the notification-area detail surface.
 - Feed the latest browser-probed usage snapshots into the notification-area
   detail surface and quota icon.
+- Keep the WebView2 fetch bridge and browser usage refresh parsing in Windows
+  browser services while shared usage snapshots stay in the portable core.
 - Stay resident in the notification area with a compact detail surface, a
   right-click menu, and a runtime quota-icon swap test.
 - Probe packaged Credential Locker storage, a local app notification, and launch-at-login startup task enablement.

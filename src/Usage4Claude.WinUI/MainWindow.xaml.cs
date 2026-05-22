@@ -1,6 +1,4 @@
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -12,6 +10,7 @@ using Usage4Claude.Core.Claude;
 using Usage4Claude.Core.Usage;
 using Usage4Claude.Infrastructure.Claude;
 using Usage4Claude.Infrastructure.Codex;
+using Usage4Claude.WinUI.Browser;
 using Usage4Claude.WinUI.Integration;
 using Usage4Claude.WinUI.State;
 using Usage4Claude.WinUI.Tray;
@@ -28,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
+    private readonly BrowserUsageRefreshService _browserRefresh;
 
     private LoginTarget _loginTarget;
     private bool _isQuitting;
@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         _claudeClient = new ClaudeUsageClient(_httpClient);
         _codexClient = new CodexUsageClient(_httpClient);
+        _browserRefresh = new BrowserUsageRefreshService(new WebViewBrowserFetchClient(LoginWebView));
         _cookieTimer.Tick += CookieTimer_Tick;
         AppWindow.SetIcon(Usage4ClaudeIconPath);
         _trayDetailWindow = new TrayDetailWindow(Usage4ClaudeIconPath, ShowProbeWindow, RefreshCapturedUsageAsync);
@@ -239,49 +240,18 @@ public sealed partial class MainWindow : Window
     private async Task<string> ProbeClaudeInBrowserAsync()
     {
         await EnsureBrowserOriginAsync(LoginTarget.Claude, "https://claude.ai/settings/usage");
-        var organizationsJson = await ExecuteFetchScriptAsync("/api/organizations");
-        var organizations = JsonSerializer.Deserialize<List<ClaudeOrganizationResponse>>(organizationsJson)
-            ?? throw new InvalidOperationException("Claude browser probe returned no organizations.");
-        var organizationId = ClaudeOrganizationBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(organizationId))
-        {
-            organizationId = organizations.FirstOrDefault()?.Uuid ?? string.Empty;
-            ClaudeOrganizationBox.Text = organizationId;
-        }
-
-        if (string.IsNullOrWhiteSpace(organizationId))
-        {
-            throw new InvalidOperationException("Claude browser probe returned no organization UUID.");
-        }
-
-        var escapedOrganizationId = Uri.EscapeDataString(organizationId);
-        var usageJson = await ExecuteFetchScriptAsync($"/api/organizations/{escapedOrganizationId}/usage");
-        var extraJson = await ExecuteFetchScriptAsync(
-            $"/api/organizations/{escapedOrganizationId}/overage_spend_limit",
-            allowFailure: true);
-        var usage = DeserializeBrowserPayload<ClaudeUsageResponse>(usageJson).ToSnapshot(
-            TryDeserializeBrowserPayload<ClaudeExtraUsageResponse>(extraJson)?.ToSnapshot());
-        _usageState.SetClaude(usage);
-        return FormatClaudeProbe(organizations.Select(value => value.ToOrganization()).ToList(), usage);
+        var refresh = await _browserRefresh.RefreshClaudeAsync(ClaudeOrganizationBox.Text.Trim());
+        ClaudeOrganizationBox.Text = refresh.OrganizationId;
+        _usageState.SetClaude(refresh.Usage);
+        return FormatClaudeProbe(refresh.Organizations, refresh.Usage);
     }
 
     private async Task<string> ProbeCodexInBrowserAsync()
     {
         await EnsureBrowserOriginAsync(LoginTarget.Codex, "https://chatgpt.com/");
-        var sessionJson = await ExecuteFetchScriptAsync("/api/auth/session");
-        var session = DeserializeBrowserPayload<Core.Codex.CodexSessionResponse>(sessionJson);
-        if (string.IsNullOrWhiteSpace(session.AccessToken))
-        {
-            throw new InvalidOperationException("ChatGPT browser session response did not contain an access token.");
-        }
-
-        var usageJson = await ExecuteFetchScriptAsync(
-            "/backend-api/wham/usage",
-            bearerToken: session.AccessToken);
-        var usage = DeserializeBrowserPayload<Core.Codex.CodexUsageResponse>(usageJson)
-            .ToSnapshot(DateTimeOffset.UtcNow);
-        _usageState.SetCodex(usage);
-        return FormatCodexProbe(session.User?.Email, session.User?.Name, usage);
+        var refresh = await _browserRefresh.RefreshCodexAsync();
+        _usageState.SetCodex(refresh.Usage);
+        return FormatCodexProbe(refresh.Email, refresh.Name, refresh.Usage);
     }
 
     private async Task CaptureCookiesAsync(bool showNoCookieMessage = false)
@@ -344,141 +314,6 @@ public sealed partial class MainWindow : Window
         _loginTarget = target;
         await NavigateAsync(url);
         throw new InvalidOperationException($"Browser moved to {expectedHost}. Run the browser probe again after the page finishes loading.");
-    }
-
-    private async Task<string> ExecuteFetchScriptAsync(
-        string path,
-        string? bearerToken = null,
-        bool allowFailure = false)
-    {
-        if (LoginWebView.CoreWebView2 is null)
-        {
-            throw new InvalidOperationException("WebView2 is not initialized.");
-        }
-
-        var pathJson = JsonSerializer.Serialize(path);
-        var bearerJson = JsonSerializer.Serialize(bearerToken);
-        var probeId = Guid.NewGuid().ToString("N");
-        var probeIdJson = JsonSerializer.Serialize(probeId);
-        var rawResult = await ExecuteBrowserProbeAsync(
-            probeId,
-            $$"""
-            (() => {
-              const id = {{probeIdJson}};
-              const send = payload => window.chrome.webview.postMessage({ id, ...payload });
-              (async () => {
-                try {
-                  const bearer = {{bearerJson}};
-                  const headers = bearer ? { authorization: `Bearer ${bearer}` } : {};
-                  const response = await fetch({{pathJson}}, {
-                    method: "GET",
-                    credentials: "include",
-                    headers
-                  });
-                  const body = await response.text();
-                  send({
-                    ok: response.ok,
-                    status: response.status,
-                    contentType: response.headers.get("content-type"),
-                    body
-                  });
-                } catch (error) {
-                  send({
-                    ok: false,
-                    status: 0,
-                    contentType: null,
-                    body: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-                  });
-                }
-              })();
-              return "probe-started";
-            })()
-            """);
-        var payload = DeserializeFetchPayload(rawResult);
-
-        if (!payload.Ok && !allowFailure)
-        {
-            throw new InvalidOperationException(
-                $"Browser fetch returned HTTP {payload.Status}. Content-Type: {payload.ContentType ?? "unknown"}. Body preview: {Preview(payload.Body)}");
-        }
-
-        return payload.Ok
-            ? payload.Body ?? throw new InvalidOperationException("Browser fetch returned an empty body.")
-            : string.Empty;
-    }
-
-    private static T DeserializeBrowserPayload<T>(string json) =>
-        JsonSerializer.Deserialize<T>(json)
-        ?? throw new InvalidOperationException($"Browser payload did not deserialize as {typeof(T).Name}.");
-
-    private static BrowserFetchPayload DeserializeFetchPayload(string rawResult)
-    {
-        using var document = JsonDocument.Parse(rawResult);
-        var payloadJson = document.RootElement.ValueKind == JsonValueKind.String
-            ? document.RootElement.GetString()
-            : document.RootElement.GetRawText();
-
-        if (string.IsNullOrWhiteSpace(payloadJson))
-        {
-            throw new InvalidOperationException("WebView2 fetch probe returned no script result.");
-        }
-
-        return JsonSerializer.Deserialize<BrowserFetchPayload>(payloadJson)
-            ?? throw new InvalidOperationException("WebView2 fetch probe returned no response payload.");
-    }
-
-    private async Task<string> ExecuteBrowserProbeAsync(string probeId, string script)
-    {
-        if (LoginWebView.CoreWebView2 is null)
-        {
-            throw new InvalidOperationException("WebView2 is not initialized.");
-        }
-
-        var result = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        void HandleMessage(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            try
-            {
-                using var message = JsonDocument.Parse(args.WebMessageAsJson);
-                if (!message.RootElement.TryGetProperty("id", out var id) ||
-                    id.GetString() != probeId)
-                {
-                    return;
-                }
-
-                result.TrySetResult(message.RootElement.GetRawText());
-            }
-            catch (JsonException exception)
-            {
-                result.TrySetException(exception);
-            }
-        }
-
-        LoginWebView.CoreWebView2.WebMessageReceived += HandleMessage;
-        try
-        {
-            await LoginWebView.CoreWebView2.ExecuteScriptAsync(script);
-            return await result.Task.WaitAsync(TimeSpan.FromSeconds(45));
-        }
-        finally
-        {
-            LoginWebView.CoreWebView2.WebMessageReceived -= HandleMessage;
-        }
-    }
-
-    private static T? TryDeserializeBrowserPayload<T>(string json) =>
-        string.IsNullOrWhiteSpace(json) ? default : JsonSerializer.Deserialize<T>(json);
-
-    private static string Preview(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return "empty";
-        }
-
-        var compact = text.ReplaceLineEndings(" ");
-        return compact.Length <= 240 ? compact : $"{compact[..240]}...";
     }
 
     private async Task RunProbeAsync(string provider, Func<Task<string>> action)
@@ -692,18 +527,4 @@ public sealed partial class MainWindow : Window
         Codex,
     }
 
-    private sealed class BrowserFetchPayload
-    {
-        [JsonPropertyName("ok")]
-        public bool Ok { get; init; }
-
-        [JsonPropertyName("status")]
-        public int Status { get; init; }
-
-        [JsonPropertyName("contentType")]
-        public string? ContentType { get; init; }
-
-        [JsonPropertyName("body")]
-        public string? Body { get; init; }
-    }
 }
