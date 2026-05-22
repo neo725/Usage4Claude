@@ -30,15 +30,19 @@ parity work is in progress.
 
 See `docs/WINDOWS_REWRITE_SPIKES.md` for the current spike acceptance checks.
 
-## Current spike probes
+## Current Windows rewrite
 
-The WinUI app currently exposes a probe surface that can:
+The WinUI app keeps the validated probe surface while the Windows product host is
+being built out. It can currently:
 
 - Accept a manually pasted Claude `sessionKey` fallback.
 - Open Claude login in WebView2 and capture the Claude session cookie.
 - Open ChatGPT login in WebView2 and capture direct or chunked Codex session cookies.
 - Probe Claude and Codex usage through the authenticated WebView2 browser context.
-- Stay resident in the notification area with a compact detail prototype, a right-click menu, and a runtime quota-icon swap test.
+- Feed the latest browser-probed usage snapshots into the notification-area
+  detail surface and quota icon.
+- Stay resident in the notification area with a compact detail surface, a
+  right-click menu, and a runtime quota-icon swap test.
 - Probe packaged Credential Locker storage, a local app notification, and launch-at-login startup task enablement.
 
 Build the branch with:

@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Usage4Claude Detail">
-    <Grid Padding="14" Width="320">
+    <Grid Padding="14" Width="336">
         <StackPanel Spacing="10">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -12,8 +12,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="2">
                     <TextBlock FontSize="18" FontWeight="SemiBold" Text="Usage4Claude" />
-                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="Notification area detail prototype" />
+                    <TextBlock x:Name="UpdatedAtText"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Sign in and refresh usage" />
                 </StackPanel>
                 <Button Grid.Column="1"
                         Content="Open"
@@ -30,9 +31,30 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="Claude" />
-                        <TextBlock Text="Browser-backed probe validated" />
+                        <TextBlock x:Name="ClaudeEmptyText" Text="No usage snapshot yet" />
+                        <StackPanel x:Name="ClaudeUsagePanel" Spacing="4" Visibility="Collapsed">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="5-hour" />
+                                <TextBlock x:Name="ClaudePrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                            </Grid>
+                            <TextBlock x:Name="ClaudePrimaryResetText"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="7-day" />
+                                <TextBlock x:Name="ClaudeSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
+                            </Grid>
+                            <TextBlock x:Name="ClaudeSecondaryResetText"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                     </StackPanel>
-                    <ProgressRing Grid.Column="1" Width="24" Height="24" IsActive="True" />
                 </Grid>
             </Border>
 
@@ -46,9 +68,30 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="Codex" />
-                        <TextBlock Text="Browser-backed probe validated" />
+                        <TextBlock x:Name="CodexEmptyText" Text="No usage snapshot yet" />
+                        <StackPanel x:Name="CodexUsagePanel" Spacing="4" Visibility="Collapsed">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Primary" />
+                                <TextBlock x:Name="CodexPrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                            </Grid>
+                            <TextBlock x:Name="CodexPrimaryResetText"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Secondary" />
+                                <TextBlock x:Name="CodexSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
+                            </Grid>
+                            <TextBlock x:Name="CodexSecondaryResetText"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                     </StackPanel>
-                    <ProgressRing Grid.Column="1" Width="24" Height="24" IsActive="True" />
                 </Grid>
             </Border>
 

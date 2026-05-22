@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
+using Usage4Claude.Core.Usage;
 using WinRT.Interop;
 
 namespace Usage4Claude.WinUI.Tray;
@@ -188,6 +189,24 @@ internal sealed class TrayIconHost : IDisposable
             2 => "Usage4Claude quota prototype 96%",
             _ => "Usage4Claude",
         };
+        ReplaceIcon(quotaIcon, ownsIconHandle: true);
+    }
+
+    public void UpdateUsage(UsageState state)
+    {
+        var primaryLimit = state.PrimaryLimit;
+        if (primaryLimit is null)
+        {
+            return;
+        }
+
+        var quotaIcon = TrayQuotaIconRenderer.CreateIcon(primaryLimit.Percentage);
+        if (quotaIcon == nint.Zero)
+        {
+            return;
+        }
+
+        _tip = $"Usage4Claude {primaryLimit.Percentage:0.#}% used";
         ReplaceIcon(quotaIcon, ownsIconHandle: true);
     }
 

@@ -71,3 +71,15 @@ Validated on May 22, 2026:
 Remaining distribution decision:
 
 - Decide the first release update channel: Microsoft Store, signed sideloaded MSIX with App Installer/update feed, or a controlled internal package flow.
+
+## Productionization
+
+The first post-spike Windows slice keeps the probe window available while moving
+real usage data out of that UI boundary:
+
+- `UsageState` in the shared core holds the latest Claude and Codex usage snapshots.
+- Successful Claude and Codex browser probes publish their snapshots into the WinUI state store.
+- The notification-area detail surface renders the latest snapshots and the tray icon follows the current primary quota signal.
+
+Account modeling, background refresh, and the full settings/detail parity pass
+remain separate follow-up slices.

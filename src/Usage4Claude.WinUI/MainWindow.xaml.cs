@@ -13,6 +13,7 @@ using Usage4Claude.Core.Usage;
 using Usage4Claude.Infrastructure.Claude;
 using Usage4Claude.Infrastructure.Codex;
 using Usage4Claude.WinUI.Integration;
+using Usage4Claude.WinUI.State;
 using Usage4Claude.WinUI.Tray;
 
 namespace Usage4Claude.WinUI;
@@ -23,6 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly ClaudeUsageClient _claudeClient;
     private readonly CodexUsageClient _codexClient;
     private readonly CredentialLockerProbe _credentialLocker = new();
+    private readonly UsageStateStore _usageState = new();
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
@@ -46,6 +48,8 @@ public sealed partial class MainWindow : Window
             ToggleDetailWindowFromTray,
             ShowProbeWindow,
             QuitFromTray);
+        _usageState.Changed += UsageState_Changed;
+        _trayDetailWindow.UpdateUsage(_usageState.Current);
         AppWindow.Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
     }
@@ -123,6 +127,7 @@ public sealed partial class MainWindow : Window
             }
 
             var usage = await _claudeClient.GetUsageAsync(organizationId, sessionKey);
+            _usageState.SetClaude(usage);
             return FormatClaudeProbe(organizations, usage);
         });
     }
@@ -154,6 +159,7 @@ public sealed partial class MainWindow : Window
             }
 
             var usage = await _codexClient.GetUsageAsync(session.AccessToken);
+            _usageState.SetCodex(usage);
             return FormatCodexProbe(session.User?.Email, session.User?.Name, usage);
         });
     }
@@ -254,6 +260,7 @@ public sealed partial class MainWindow : Window
             allowFailure: true);
         var usage = DeserializeBrowserPayload<ClaudeUsageResponse>(usageJson).ToSnapshot(
             TryDeserializeBrowserPayload<ClaudeExtraUsageResponse>(extraJson)?.ToSnapshot());
+        _usageState.SetClaude(usage);
         return FormatClaudeProbe(organizations.Select(value => value.ToOrganization()).ToList(), usage);
     }
 
@@ -272,6 +279,7 @@ public sealed partial class MainWindow : Window
             bearerToken: session.AccessToken);
         var usage = DeserializeBrowserPayload<Core.Codex.CodexUsageResponse>(usageJson)
             .ToSnapshot(DateTimeOffset.UtcNow);
+        _usageState.SetCodex(usage);
         return FormatCodexProbe(session.User?.Email, session.User?.Name, usage);
     }
 
@@ -573,6 +581,7 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _cookieTimer.Stop();
+        _usageState.Changed -= UsageState_Changed;
         _trayDetailWindow.Close();
         _trayIconHost.Dispose();
         _httpClient.Dispose();
@@ -613,6 +622,12 @@ public sealed partial class MainWindow : Window
         _trayDetailWindow.Close();
         _trayIconHost.Dispose();
         Close();
+    }
+
+    private void UsageState_Changed(object? sender, UsageState state)
+    {
+        _trayDetailWindow.UpdateUsage(state);
+        _trayIconHost.UpdateUsage(state);
     }
 
     private static string Usage4ClaudeIconPath =>
