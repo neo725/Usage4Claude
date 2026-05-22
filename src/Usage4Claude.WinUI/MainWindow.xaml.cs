@@ -484,7 +484,7 @@ public sealed partial class MainWindow : Window
         try
         {
             ProbeResultBox.Text = await action();
-            SetStatus($"{provider} probe succeeded", "The current Windows Spike 1 path reached usage data.", InfoBarSeverity.Success);
+            SetStatus($"{provider} probe succeeded", "Usage data reached the tray snapshot state.", InfoBarSeverity.Success);
         }
         catch (Exception exception)
         {
@@ -606,6 +606,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        RefreshTraySurfaces();
         _trayDetailWindow.AppWindow.Show();
         _trayDetailWindow.Activate();
     }
@@ -626,6 +627,12 @@ public sealed partial class MainWindow : Window
 
     private void UsageState_Changed(object? sender, UsageState state)
     {
+        RefreshTraySurfaces();
+    }
+
+    private void RefreshTraySurfaces()
+    {
+        var state = _usageState.Current;
         _trayDetailWindow.UpdateUsage(state);
         _trayIconHost.UpdateUsage(state);
     }
