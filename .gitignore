@@ -89,3 +89,10 @@ ClaudeUsageMonitor
 *~
 *.bak
 *.backup
+
+# .NET / Visual Studio
+**/bin/
+**/obj/
+.vs/
+TestResults/
+AppPackages/

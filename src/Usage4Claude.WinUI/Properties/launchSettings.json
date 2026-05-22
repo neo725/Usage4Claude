@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Usage4Claude.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Usage4Claude.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
