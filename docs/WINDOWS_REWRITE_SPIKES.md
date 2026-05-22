@@ -46,6 +46,11 @@ Spike note:
 
 - The Swift menu-bar renderer can lay out several provider and metric icons horizontally. A Windows notification-area icon is a small square icon slot, so the Windows product should treat the tray icon as a single compact status signal and keep multi-provider detail in the click surface.
 
+Validated on May 22, 2026:
+
+- The packaged host stayed resident after the main probe window closed.
+- Left-click detail toggling, right-click tray menu actions, dynamic quota icon cycling, and `NOTIFYICON_VERSION_4` tooltip display worked from the notification area.
+
 ### Spike 3: Packaged Windows integration
 
 Prototype secure local credential storage, notifications, launch at login, and MSIX update/distribution decisions. Cross-device sync is a future storage concern and is not required by the first Windows release.
@@ -57,9 +62,12 @@ Implemented on May 22, 2026:
 - The probe surface can request a local Windows App SDK app notification.
 - The probe surface can request enablement for the packaged launch-at-login startup task and report the resulting state.
 
-Manual packaged validation still needed:
+Validated on May 22, 2026:
 
-1. Store and reload a real Claude session key from Credential Locker after restarting the app.
-2. Send the notification probe from a non-elevated packaged run and click it to confirm foreground activation.
-3. Enable launch at login, inspect the startup state in Windows, sign out or reboot, and confirm the resident host returns.
-4. Decide the first release update channel: Microsoft Store, signed sideloaded MSIX with App Installer/update feed, or a controlled internal package flow.
+- Claude browser login produced a session key that Credential Locker stored and reloaded after the app quit and restarted.
+- A local app notification appeared from the packaged host and clicking it foregrounded Usage4Claude.
+- The startup task enabled launch at login, and Usage4Claude launched again after a Windows reboot.
+
+Remaining distribution decision:
+
+- Decide the first release update channel: Microsoft Store, signed sideloaded MSIX with App Installer/update feed, or a controlled internal package flow.
