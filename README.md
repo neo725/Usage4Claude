@@ -39,6 +39,8 @@ being built out. It can currently:
 - Open Claude login in WebView2 and capture the Claude session cookie.
 - Open ChatGPT login in WebView2 and capture direct or chunked Codex session cookies.
 - Probe Claude and Codex usage through the authenticated WebView2 browser context.
+- Refresh the signed-in browser provider automatically after cookie capture and
+  from the notification-area detail surface.
 - Feed the latest browser-probed usage snapshots into the notification-area
   detail surface and quota icon.
 - Stay resident in the notification area with a compact detail surface, a

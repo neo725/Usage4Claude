@@ -7,11 +7,13 @@ namespace Usage4Claude.WinUI.Tray;
 public sealed partial class TrayDetailWindow : Window
 {
     private readonly Action _openProbe;
+    private readonly Func<Task> _refreshUsage;
 
-    public TrayDetailWindow(string iconPath, Action openProbe)
+    public TrayDetailWindow(string iconPath, Action openProbe, Func<Task> refreshUsage)
     {
         InitializeComponent();
         _openProbe = openProbe;
+        _refreshUsage = refreshUsage;
         AppWindow.SetIcon(iconPath);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(348, 318));
 
@@ -33,6 +35,19 @@ public sealed partial class TrayDetailWindow : Window
     private void HideDetail_Click(object sender, RoutedEventArgs e)
     {
         HideDetail();
+    }
+
+    private async void RefreshUsage_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshButton.IsEnabled = false;
+        try
+        {
+            await _refreshUsage();
+        }
+        finally
+        {
+            RefreshButton.IsEnabled = true;
+        }
     }
 
     public void HideDetail()

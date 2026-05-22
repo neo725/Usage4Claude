@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
 
     private LoginTarget _loginTarget;
     private bool _isQuitting;
+    private bool _refreshInProgress;
     private string? _claudeSessionKey;
     private string? _codexCookieHeader;
 
@@ -41,7 +42,7 @@ public sealed partial class MainWindow : Window
         _codexClient = new CodexUsageClient(_httpClient);
         _cookieTimer.Tick += CookieTimer_Tick;
         AppWindow.SetIcon(Usage4ClaudeIconPath);
-        _trayDetailWindow = new TrayDetailWindow(Usage4ClaudeIconPath, ShowProbeWindow);
+        _trayDetailWindow = new TrayDetailWindow(Usage4ClaudeIconPath, ShowProbeWindow, RefreshCapturedUsageAsync);
         _trayIconHost = new TrayIconHost(
             this,
             Usage4ClaudeIconPath,
@@ -94,7 +95,7 @@ public sealed partial class MainWindow : Window
 
     private async void ProbeClaude_Click(object sender, RoutedEventArgs e)
     {
-        await RunProbeAsync("Claude browser", ProbeClaudeInBrowserAsync);
+        await RunBrowserRefreshAsync(LoginTarget.Claude);
     }
 
     private async void ProbeClaudeHttp_Click(object sender, RoutedEventArgs e)
@@ -134,7 +135,7 @@ public sealed partial class MainWindow : Window
 
     private async void ProbeCodex_Click(object sender, RoutedEventArgs e)
     {
-        await RunProbeAsync("Codex browser", ProbeCodexInBrowserAsync);
+        await RunBrowserRefreshAsync(LoginTarget.Codex);
     }
 
     private async void ProbeCodexHttp_Click(object sender, RoutedEventArgs e)
@@ -303,7 +304,8 @@ public sealed partial class MainWindow : Window
                 _claudeSessionKey = sessionCookie.Value;
                 ClaudeSessionKeyBox.Text = sessionCookie.Value;
                 _cookieTimer.Stop();
-                SetStatus("Claude cookie captured", "Probe Claude usage or keep the manual key as a fallback.", InfoBarSeverity.Success);
+                SetStatus("Claude cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
+                await RefreshCapturedUsageAsync();
                 return;
             }
         }
@@ -317,7 +319,8 @@ public sealed partial class MainWindow : Window
             {
                 _codexCookieHeader = string.Join("; ", chatGptCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
                 _cookieTimer.Stop();
-                SetStatus("Codex cookie captured", "Probe Codex usage while the captured ChatGPT session is fresh.", InfoBarSeverity.Success);
+                SetStatus("Codex cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
+                await RefreshCapturedUsageAsync();
                 return;
             }
         }
@@ -490,6 +493,46 @@ public sealed partial class MainWindow : Window
         {
             ProbeResultBox.Text = exception.ToString();
             SetStatus($"{provider} probe failed", exception.Message, InfoBarSeverity.Error);
+        }
+    }
+
+    private Task RefreshCapturedUsageAsync()
+    {
+        if (_loginTarget == LoginTarget.None)
+        {
+            SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
+            return Task.CompletedTask;
+        }
+
+        return RunBrowserRefreshAsync(_loginTarget);
+    }
+
+    private async Task RunBrowserRefreshAsync(LoginTarget target)
+    {
+        if (_refreshInProgress)
+        {
+            return;
+        }
+
+        _refreshInProgress = true;
+        try
+        {
+            switch (target)
+            {
+                case LoginTarget.Claude:
+                    await RunProbeAsync("Claude browser refresh", ProbeClaudeInBrowserAsync);
+                    break;
+                case LoginTarget.Codex:
+                    await RunProbeAsync("Codex browser refresh", ProbeCodexInBrowserAsync);
+                    break;
+                default:
+                    SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
+                    break;
+            }
+        }
+        finally
+        {
+            _refreshInProgress = false;
         }
     }
 

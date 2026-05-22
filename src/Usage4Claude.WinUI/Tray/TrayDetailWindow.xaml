@@ -16,9 +16,13 @@
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="Sign in and refresh usage" />
                 </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Open"
-                        Click="OpenProbe_Click" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                    <Button x:Name="RefreshButton"
+                            Content="Refresh"
+                            Click="RefreshUsage_Click" />
+                    <Button Content="Open"
+                            Click="OpenProbe_Click" />
+                </StackPanel>
             </Grid>
 
             <Border Padding="10"
