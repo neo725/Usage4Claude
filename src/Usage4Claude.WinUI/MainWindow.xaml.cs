@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private readonly UsageStateStore _usageState = new();
     private readonly ProviderSessionStateStore _sessionState = new();
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _usageRefreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
     private readonly BrowserUsageRefreshService _browserRefresh;
@@ -33,6 +34,8 @@ public sealed partial class MainWindow : Window
     private LoginTarget _loginTarget;
     private bool _isQuitting;
     private bool _refreshInProgress;
+    private bool _startupRecoveryStarted;
+    private bool _suppressNavigationCookieCapture;
     private string? _claudeSessionKey;
     private string? _codexCookieHeader;
 
@@ -43,6 +46,7 @@ public sealed partial class MainWindow : Window
         _codexClient = new CodexUsageClient(_httpClient);
         _browserRefresh = new BrowserUsageRefreshService(new WebViewBrowserFetchClient(LoginWebView));
         _cookieTimer.Tick += CookieTimer_Tick;
+        _usageRefreshTimer.Tick += UsageRefreshTimer_Tick;
         AppWindow.SetIcon(Usage4ClaudeIconPath);
         _trayDetailWindow = new TrayDetailWindow(Usage4ClaudeIconPath, ShowProbeWindow, RefreshCapturedUsageAsync);
         _trayIconHost = new TrayIconHost(
@@ -54,6 +58,7 @@ public sealed partial class MainWindow : Window
         _usageState.Changed += UsageState_Changed;
         _sessionState.Changed += SessionState_Changed;
         RefreshTraySurfaces();
+        Activated += MainWindow_Activated;
         AppWindow.Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
     }
@@ -84,6 +89,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (_suppressNavigationCookieCapture)
+        {
+            return;
+        }
+
         _cookieTimer.Start();
         await CaptureCookiesAsync();
     }
@@ -91,6 +101,22 @@ public sealed partial class MainWindow : Window
     private async void CookieTimer_Tick(object? sender, object e)
     {
         await CaptureCookiesAsync();
+    }
+
+    private async void UsageRefreshTimer_Tick(object? sender, object e)
+    {
+        await RefreshCapturedUsageAsync();
+    }
+
+    private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+    {
+        if (_startupRecoveryStarted)
+        {
+            return;
+        }
+
+        _startupRecoveryStarted = true;
+        await RecoverBrowserSessionsAsync();
     }
 
     private async void CaptureCookies_Click(object sender, RoutedEventArgs e)
@@ -174,6 +200,7 @@ public sealed partial class MainWindow : Window
     {
         await LoginWebView.EnsureCoreWebView2Async();
         await LoginWebView.CoreWebView2.Profile.ClearBrowsingDataAsync();
+        _usageRefreshTimer.Stop();
         _claudeSessionKey = null;
         _codexCookieHeader = null;
         _sessionState.ClearBrowserSessions();
@@ -244,6 +271,98 @@ public sealed partial class MainWindow : Window
         LoginWebView.Source = new Uri(url);
     }
 
+    private async Task NavigateAndWaitAsync(string url)
+    {
+        await LoginWebView.EnsureCoreWebView2Async();
+        var navigation = new TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void HandleNavigation(WebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
+            navigation.TrySetResult(args);
+
+        LoginWebView.NavigationCompleted += HandleNavigation;
+        try
+        {
+            LoginWebView.Source = new Uri(url);
+            var args = await navigation.Task.WaitAsync(TimeSpan.FromSeconds(45));
+            if (!args.IsSuccess)
+            {
+                throw new InvalidOperationException($"WebView2 startup navigation failed with {args.WebErrorStatus}.");
+            }
+        }
+        finally
+        {
+            LoginWebView.NavigationCompleted -= HandleNavigation;
+        }
+    }
+
+    private async Task RecoverBrowserSessionsAsync()
+    {
+        try
+        {
+            await LoginWebView.EnsureCoreWebView2Async();
+
+            var claudeCookies = await LoginWebView.CoreWebView2.CookieManager.GetCookiesAsync("https://claude.ai");
+            var claudeSessionCookie = claudeCookies.FirstOrDefault(cookie =>
+                cookie.Name == "sessionKey" &&
+                cookie.Domain.Contains("claude.ai", StringComparison.OrdinalIgnoreCase));
+            if (claudeSessionCookie is not null)
+            {
+                _claudeSessionKey = claudeSessionCookie.Value;
+                ClaudeSessionKeyBox.Text = claudeSessionCookie.Value;
+                _sessionState.SetClaudeWebViewSession();
+            }
+
+            var chatGptCookies = await LoginWebView.CoreWebView2.CookieManager.GetCookiesAsync("https://chatgpt.com");
+            var sessionToken = ExtractChunkedSessionToken(chatGptCookies);
+            if (!string.IsNullOrWhiteSpace(sessionToken))
+            {
+                _codexCookieHeader = string.Join("; ", chatGptCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
+                _sessionState.SetCodexWebViewSession();
+            }
+
+            var providerToRestore = claudeSessionCookie is not null
+                ? LoginTarget.Claude
+                : !string.IsNullOrWhiteSpace(sessionToken)
+                    ? LoginTarget.Codex
+                    : LoginTarget.None;
+            if (providerToRestore == LoginTarget.None)
+            {
+                return;
+            }
+
+            _loginTarget = providerToRestore;
+            _sessionState.ActivateBrowser(providerToRestore == LoginTarget.Claude
+                ? ProviderKind.Claude
+                : ProviderKind.Codex);
+            _suppressNavigationCookieCapture = true;
+            try
+            {
+                if (providerToRestore == LoginTarget.Claude)
+                {
+                    BrowserModeText.Text = "Claude restored session";
+                    await NavigateAndWaitAsync("https://claude.ai/settings/usage");
+                }
+                else
+                {
+                    BrowserModeText.Text = "Codex restored session";
+                    await NavigateAndWaitAsync("https://chatgpt.com/");
+                }
+            }
+            finally
+            {
+                _suppressNavigationCookieCapture = false;
+            }
+
+            _usageRefreshTimer.Start();
+            await RunBrowserRefreshAsync(providerToRestore);
+        }
+        catch (Exception exception)
+        {
+            SetStatus("Startup browser recovery skipped", exception.Message, InfoBarSeverity.Warning);
+        }
+    }
+
     private async Task<string> ProbeClaudeInBrowserAsync()
     {
         await EnsureBrowserOriginAsync(LoginTarget.Claude, "https://claude.ai/settings/usage");
@@ -282,6 +401,7 @@ public sealed partial class MainWindow : Window
                 _sessionState.SetClaudeWebViewSession();
                 ClaudeSessionKeyBox.Text = sessionCookie.Value;
                 _cookieTimer.Stop();
+                _usageRefreshTimer.Start();
                 SetStatus("Claude cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
                 await RefreshCapturedUsageAsync();
                 return;
@@ -298,6 +418,7 @@ public sealed partial class MainWindow : Window
                 _codexCookieHeader = string.Join("; ", chatGptCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
                 _sessionState.SetCodexWebViewSession();
                 _cookieTimer.Stop();
+                _usageRefreshTimer.Start();
                 SetStatus("Codex cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
                 await RefreshCapturedUsageAsync();
                 return;
@@ -472,8 +593,10 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _cookieTimer.Stop();
+        _usageRefreshTimer.Stop();
         _usageState.Changed -= UsageState_Changed;
         _sessionState.Changed -= SessionState_Changed;
+        Activated -= MainWindow_Activated;
         _trayDetailWindow.Close();
         _trayIconHost.Dispose();
         _httpClient.Dispose();

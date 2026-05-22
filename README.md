@@ -47,6 +47,8 @@ being built out. It can currently:
   browser services while shared usage snapshots stay in the portable core.
 - Track signed-in provider session availability in WinUI state so tray refresh
   and empty-state rendering no longer rely only on the last login button clicked.
+- Restore surviving WebView2 browser sessions on app activation and keep the
+  active browser provider refreshed on a conservative resident cadence.
 - Stay resident in the notification area with a compact detail surface, a
   right-click menu, and a runtime quota-icon swap test.
 - Probe packaged Credential Locker storage, a local app notification, and launch-at-login startup task enablement.

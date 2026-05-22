@@ -83,6 +83,7 @@ real usage data out of that UI boundary:
 - Capturing a signed-in Claude or Codex browser session starts a browser-backed refresh, and the tray detail surface can refresh the current browser provider again.
 - Browser-backed fetch execution and provider refresh parsing now live in WinUI browser services instead of the probe window.
 - WinUI session state records WebView and Credential Locker provider availability so tray refresh selection and empty states do not depend only on the transient login target.
+- Startup recovery inspects surviving WebView2 Claude and Codex cookies, restores one active browser provider snapshot, and starts a conservative resident refresh cadence for that active provider.
 
 Validated on May 22, 2026:
 
@@ -94,3 +95,7 @@ Validated on May 22, 2026:
 
 Account modeling, background refresh, and the full settings/detail parity pass
 remain separate follow-up slices.
+
+Manual validation next:
+
+- Quit and relaunch the packaged host after Claude/Codex browser sessions exist; startup should restore a browser-backed snapshot without another login click.
