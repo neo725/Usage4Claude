@@ -81,5 +81,10 @@ real usage data out of that UI boundary:
 - Successful Claude and Codex browser probes publish their snapshots into the WinUI state store.
 - The notification-area detail surface renders the latest snapshots and the tray icon follows the current primary quota signal.
 
+Validated on May 22, 2026:
+
+- Claude browser-probed 5-hour and 7-day usage appeared in the notification-area detail surface.
+- Codex browser-probed primary and secondary usage appeared in the same detail surface.
+
 Account modeling, background refresh, and the full settings/detail parity pass
 remain separate follow-up slices.
