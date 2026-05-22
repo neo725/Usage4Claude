@@ -90,6 +90,7 @@ Validated on May 22, 2026:
 - Codex browser-probed primary and secondary usage appeared in the same detail surface.
 - Fresh Claude and Codex browser logins refreshed the detail surface after cookie capture without requiring a manual probe click.
 - Claude login, Codex login, and tray detail refresh smoke tests still passed after browser refresh extraction.
+- Loading the Claude Credential Locker fallback marks Claude as available without pretending a browser-backed usage snapshot already exists.
 
 Account modeling, background refresh, and the full settings/detail parity pass
 remain separate follow-up slices.

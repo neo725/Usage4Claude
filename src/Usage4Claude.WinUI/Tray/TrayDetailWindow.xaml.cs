@@ -62,17 +62,22 @@ public sealed partial class TrayDetailWindow : Window
             ? "Sign in and refresh usage"
             : $"Updated {usageState.UpdatedAt.Value.ToLocalTime():t}";
 
-        UpdateClaude(usageState.Claude, sessionState.HasClaude);
+        UpdateClaude(usageState.Claude, sessionState.Claude);
         UpdateCodex(usageState.Codex, sessionState.HasCodex);
     }
 
-    private void UpdateClaude(ClaudeUsageSnapshot? usage, bool hasSession)
+    private void UpdateClaude(ClaudeUsageSnapshot? usage, ProviderSessionSource sessionSource)
     {
         ClaudeEmptyText.Visibility = usage is null ? Visibility.Visible : Visibility.Collapsed;
         ClaudeUsagePanel.Visibility = usage is null ? Visibility.Collapsed : Visibility.Visible;
         if (usage is null)
         {
-            ClaudeEmptyText.Text = hasSession ? "Waiting for refresh" : "Not signed in";
+            ClaudeEmptyText.Text = sessionSource switch
+            {
+                ProviderSessionSource.WebViewCookie => "Waiting for browser refresh",
+                ProviderSessionSource.CredentialLocker => "Credential loaded; browser refresh needed",
+                _ => "Not signed in",
+            };
             return;
         }
 
