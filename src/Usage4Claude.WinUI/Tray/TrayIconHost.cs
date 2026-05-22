@@ -24,6 +24,7 @@ internal sealed class TrayIconHost : IDisposable
 
     private bool _disposed;
     private int _quotaIconIndex;
+    private string _tip = "Usage4Claude";
 
     public TrayIconHost(Window window, string iconPath, Action toggleWindow, Action showSettings, Action quit)
     {
@@ -76,15 +77,18 @@ internal sealed class TrayIconHost : IDisposable
     }
 
     private NotifyIconData CreateIconData() =>
+        CreateIconData(NotifyIconFlags.Message | NotifyIconFlags.Icon | NotifyIconFlags.Tip);
+
+    private NotifyIconData CreateIconData(NotifyIconFlags flags) =>
         new()
         {
             Size = (uint)Marshal.SizeOf<NotifyIconData>(),
             WindowHandle = _windowHandle,
             Id = TrayIconId,
-            Flags = NotifyIconFlags.Message | NotifyIconFlags.Icon | NotifyIconFlags.Tip,
+            Flags = flags,
             CallbackMessage = CallbackMessage,
             IconHandle = _iconHandle,
-            Tip = "Usage4Claude",
+            Tip = _tip,
         };
 
     private nint WindowProcedure(nint windowHandle, uint message, nint wParam, nint lParam)
@@ -163,7 +167,8 @@ internal sealed class TrayIconHost : IDisposable
 
     private void CycleQuotaIcon()
     {
-        var quotaIcon = _quotaIconIndex++ % 4 switch
+        var cycleStep = _quotaIconIndex++ % 4;
+        var quotaIcon = cycleStep switch
         {
             0 => TrayQuotaIconRenderer.CreateIcon(27),
             1 => TrayQuotaIconRenderer.CreateIcon(73),
@@ -176,6 +181,13 @@ internal sealed class TrayIconHost : IDisposable
             return;
         }
 
+        _tip = cycleStep switch
+        {
+            0 => "Usage4Claude quota prototype 27%",
+            1 => "Usage4Claude quota prototype 73%",
+            2 => "Usage4Claude quota prototype 96%",
+            _ => "Usage4Claude",
+        };
         ReplaceIcon(quotaIcon, ownsIconHandle: true);
     }
 
@@ -197,8 +209,7 @@ internal sealed class TrayIconHost : IDisposable
         _iconHandle = iconHandle;
         _ownsIconHandle = ownsIconHandle;
 
-        var icon = CreateIconData();
-        if (!Shell_NotifyIcon(NotifyIconMessage.Modify, ref icon))
+        if (!TryReplaceTrayIcon())
         {
             _iconHandle = oldIconHandle;
             _ownsIconHandle = oldIconOwned;
@@ -214,6 +225,20 @@ internal sealed class TrayIconHost : IDisposable
         {
             DestroyIcon(oldIconHandle);
         }
+    }
+
+    private bool TryReplaceTrayIcon()
+    {
+        var icon = CreateIconData();
+        Shell_NotifyIcon(NotifyIconMessage.Delete, ref icon);
+        if (!Shell_NotifyIcon(NotifyIconMessage.Add, ref icon))
+        {
+            return false;
+        }
+
+        icon.TimeoutOrVersion = 4;
+        Shell_NotifyIcon(NotifyIconMessage.SetVersion, ref icon);
+        return true;
     }
 
     private delegate nint WndProc(nint windowHandle, uint message, nint wParam, nint lParam);
