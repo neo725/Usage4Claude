@@ -88,6 +88,7 @@ Validated on May 22, 2026:
 - Claude browser-probed 5-hour and 7-day usage appeared in the notification-area detail surface.
 - Codex browser-probed primary and secondary usage appeared in the same detail surface.
 - Fresh Claude and Codex browser logins refreshed the detail surface after cookie capture without requiring a manual probe click.
+- Claude login, Codex login, and tray detail refresh smoke tests still passed after browser refresh extraction.
 
 Account modeling, background refresh, and the full settings/detail parity pass
 remain separate follow-up slices.
