@@ -84,6 +84,7 @@ real usage data out of that UI boundary:
 - Browser-backed fetch execution and provider refresh parsing now live in WinUI browser services instead of the probe window.
 - WinUI session state records WebView and Credential Locker provider availability so tray refresh selection and empty states do not depend only on the transient login target.
 - Startup recovery inspects surviving WebView2 Claude and Codex cookies, restores every available browser-backed provider snapshot, and starts a conservative resident refresh cadence.
+- Browser-backed refresh now uses an adaptive policy: startup and cookie capture refresh immediately, resident background refresh runs every 15 minutes with jitter, opening tray detail refreshes only stale snapshots, manual tray refresh has a 60-second cooldown, and failed refreshes keep the last snapshot while backing off or pausing on authorization failures.
 
 Validated on May 22, 2026:
 

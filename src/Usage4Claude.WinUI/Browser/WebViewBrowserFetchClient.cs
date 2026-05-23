@@ -47,6 +47,7 @@ internal sealed class WebViewBrowserFetchClient
                   send({
                     ok: response.ok,
                     status: response.status,
+                    retryAfter: response.headers.get("retry-after"),
                     contentType: response.headers.get("content-type"),
                     body
                   });
@@ -54,6 +55,7 @@ internal sealed class WebViewBrowserFetchClient
                   send({
                     ok: false,
                     status: 0,
+                    retryAfter: null,
                     contentType: null,
                     body: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
                   });
@@ -66,8 +68,11 @@ internal sealed class WebViewBrowserFetchClient
 
         if (!payload.Ok && !allowFailure)
         {
+            var retryAfter = string.IsNullOrWhiteSpace(payload.RetryAfter)
+                ? string.Empty
+                : $" Retry-After: {payload.RetryAfter}.";
             throw new InvalidOperationException(
-                $"Browser fetch returned HTTP {payload.Status}. Content-Type: {payload.ContentType ?? "unknown"}. Body preview: {Preview(payload.Body)}");
+                $"Browser fetch returned HTTP {payload.Status}.{retryAfter} Content-Type: {payload.ContentType ?? "unknown"}. Body preview: {Preview(payload.Body)}");
         }
 
         return payload.Ok
@@ -149,6 +154,9 @@ internal sealed class WebViewBrowserFetchClient
 
         [JsonPropertyName("status")]
         public int Status { get; init; }
+
+        [JsonPropertyName("retryAfter")]
+        public string? RetryAfter { get; init; }
 
         [JsonPropertyName("contentType")]
         public string? ContentType { get; init; }

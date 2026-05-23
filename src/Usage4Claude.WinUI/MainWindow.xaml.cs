@@ -26,16 +26,20 @@ public sealed partial class MainWindow : Window
     private readonly UsageStateStore _usageState = new();
     private readonly ProviderSessionStateStore _sessionState = new();
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly DispatcherTimer _usageRefreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
+    private readonly DispatcherTimer _usageRefreshTimer = new();
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
     private readonly BrowserUsageRefreshService _browserRefresh;
+    private readonly Dictionary<LoginTarget, DateTimeOffset> _lastBrowserRefreshAt = new();
+    private readonly Dictionary<LoginTarget, DateTimeOffset> _nextBrowserRefreshAllowedAt = new();
+    private readonly Dictionary<LoginTarget, int> _browserRefreshFailureCounts = new();
 
     private LoginTarget _loginTarget;
     private bool _isQuitting;
     private bool _refreshInProgress;
     private bool _startupRecoveryStarted;
     private bool _suppressNavigationCookieCapture;
+    private DateTimeOffset _lastManualRefreshAt = DateTimeOffset.MinValue;
     private string? _claudeSessionKey;
     private string? _codexCookieHeader;
 
@@ -105,7 +109,12 @@ public sealed partial class MainWindow : Window
 
     private async void UsageRefreshTimer_Tick(object? sender, object e)
     {
-        await RefreshCapturedUsageAsync();
+        _usageRefreshTimer.Stop();
+        await RefreshCapturedUsageAsync(RefreshTrigger.Background);
+        if (GetAvailableBrowserProviders().Any())
+        {
+            ScheduleBackgroundRefresh();
+        }
     }
 
     private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
@@ -201,6 +210,10 @@ public sealed partial class MainWindow : Window
         await LoginWebView.EnsureCoreWebView2Async();
         await LoginWebView.CoreWebView2.Profile.ClearBrowsingDataAsync();
         _usageRefreshTimer.Stop();
+        _lastBrowserRefreshAt.Clear();
+        _nextBrowserRefreshAllowedAt.Clear();
+        _browserRefreshFailureCounts.Clear();
+        _lastManualRefreshAt = DateTimeOffset.MinValue;
         _claudeSessionKey = null;
         _codexCookieHeader = null;
         _sessionState.ClearBrowserSessions();
@@ -330,8 +343,8 @@ public sealed partial class MainWindow : Window
             BrowserModeText.Text = recoveredProviders.Count == 1
                 ? $"{recoveredProviders[0]} restored session"
                 : "Restored browser sessions";
-            _usageRefreshTimer.Start();
-            await RefreshAvailableBrowserUsageAsync();
+            ScheduleBackgroundRefresh();
+            await RefreshAvailableBrowserUsageAsync(RefreshTrigger.Startup);
         }
         catch (Exception exception)
         {
@@ -377,9 +390,9 @@ public sealed partial class MainWindow : Window
                 _sessionState.SetClaudeWebViewSession();
                 ClaudeSessionKeyBox.Text = sessionCookie.Value;
                 _cookieTimer.Stop();
-                _usageRefreshTimer.Start();
+                ScheduleBackgroundRefresh();
                 SetStatus("Claude cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
-                await RefreshCapturedUsageAsync();
+                await RefreshCapturedUsageAsync(RefreshTrigger.CookieCapture);
                 return;
             }
         }
@@ -394,9 +407,9 @@ public sealed partial class MainWindow : Window
                 _codexCookieHeader = string.Join("; ", chatGptCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
                 _sessionState.SetCodexWebViewSession();
                 _cookieTimer.Stop();
-                _usageRefreshTimer.Start();
+                ScheduleBackgroundRefresh();
                 SetStatus("Codex cookie captured", "Refreshing usage through the signed-in browser context.", InfoBarSeverity.Success);
-                await RefreshCapturedUsageAsync();
+                await RefreshCapturedUsageAsync(RefreshTrigger.CookieCapture);
                 return;
             }
         }
@@ -429,22 +442,35 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task RunProbeAsync(string provider, Func<Task<string>> action)
+    private async Task<bool> RunProbeAsync(
+        string provider,
+        Func<Task<string>> action,
+        bool throwOnFailure = false)
     {
         SetStatus($"Probing {provider}", "Calling the current usage endpoints.", InfoBarSeverity.Informational);
         try
         {
             ProbeResultBox.Text = await action();
             SetStatus($"{provider} probe succeeded", "Usage data reached the tray snapshot state.", InfoBarSeverity.Success);
+            return true;
         }
         catch (Exception exception)
         {
             ProbeResultBox.Text = exception.ToString();
             SetStatus($"{provider} probe failed", exception.Message, InfoBarSeverity.Error);
+            if (throwOnFailure)
+            {
+                throw;
+            }
+
+            return false;
         }
     }
 
-    private Task RefreshCapturedUsageAsync()
+    private Task RefreshCapturedUsageAsync() =>
+        RefreshCapturedUsageAsync(RefreshTrigger.Manual);
+
+    private Task RefreshCapturedUsageAsync(RefreshTrigger trigger)
     {
         if (!GetAvailableBrowserProviders().Any())
         {
@@ -452,7 +478,7 @@ public sealed partial class MainWindow : Window
             return Task.CompletedTask;
         }
 
-        return RefreshAvailableBrowserUsageAsync();
+        return RefreshAvailableBrowserUsageAsync(trigger);
     }
 
     private Task RunBrowserRefreshAsync(ProviderKind provider) =>
@@ -476,7 +502,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task RefreshAvailableBrowserUsageAsync()
+    private async Task RefreshAvailableBrowserUsageAsync(RefreshTrigger trigger)
     {
         if (_refreshInProgress)
         {
@@ -486,9 +512,19 @@ public sealed partial class MainWindow : Window
         _refreshInProgress = true;
         try
         {
+            if (trigger == RefreshTrigger.Manual && IsManualRefreshCoolingDown())
+            {
+                return;
+            }
+
             foreach (var provider in GetAvailableBrowserProviders())
             {
-                await RunBrowserRefreshCoreAsync(provider);
+                if (!ShouldRefreshProvider(provider, trigger))
+                {
+                    continue;
+                }
+
+                await RunBrowserRefreshCoreAsync(provider, trigger);
             }
         }
         finally
@@ -497,23 +533,168 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task RunBrowserRefreshCoreAsync(LoginTarget target)
+    private async Task RunBrowserRefreshCoreAsync(LoginTarget target, RefreshTrigger trigger = RefreshTrigger.ManualProbe)
     {
         switch (target)
         {
             case LoginTarget.Claude:
                 _sessionState.ActivateBrowser(ProviderKind.Claude);
-                await RunProbeAsync("Claude browser refresh", ProbeClaudeInBrowserAsync);
+                await RunProviderRefreshAsync(target, "Claude browser refresh", ProbeClaudeInBrowserAsync, trigger);
                 break;
             case LoginTarget.Codex:
                 _sessionState.ActivateBrowser(ProviderKind.Codex);
-                await RunProbeAsync("Codex browser refresh", ProbeCodexInBrowserAsync);
+                await RunProviderRefreshAsync(target, "Codex browser refresh", ProbeCodexInBrowserAsync, trigger);
                 break;
             default:
                 SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
                 break;
         }
     }
+
+    private async Task RunProviderRefreshAsync(
+        LoginTarget target,
+        string provider,
+        Func<Task<string>> action,
+        RefreshTrigger trigger)
+    {
+        try
+        {
+            var succeeded = await RunProbeAsync(provider, action, throwOnFailure: IsPolicyManagedRefresh(trigger));
+            if (!succeeded)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            _lastBrowserRefreshAt[target] = now;
+            _nextBrowserRefreshAllowedAt.Remove(target);
+            _browserRefreshFailureCounts[target] = 0;
+            if (trigger == RefreshTrigger.Manual)
+            {
+                _lastManualRefreshAt = now;
+            }
+        }
+        catch (Exception exception) when (IsPolicyManagedRefresh(trigger))
+        {
+            ApplyRefreshBackoff(target, exception);
+        }
+    }
+
+    private bool ShouldRefreshProvider(LoginTarget provider, RefreshTrigger trigger)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (_nextBrowserRefreshAllowedAt.TryGetValue(provider, out var nextAllowed) &&
+            now < nextAllowed)
+        {
+            SetStatus(
+                "Refresh delayed",
+                nextAllowed == DateTimeOffset.MaxValue
+                    ? $"{provider} refresh is paused until you sign in again."
+                    : $"{provider} refresh is paused until {nextAllowed.ToLocalTime():t} after the last failure.",
+                InfoBarSeverity.Warning);
+            return false;
+        }
+
+        if (trigger == RefreshTrigger.DetailOpen &&
+            _lastBrowserRefreshAt.TryGetValue(provider, out var lastRefresh) &&
+            now - lastRefresh < DetailOpenRefreshStaleAfter)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsManualRefreshCoolingDown()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var nextAllowed = _lastManualRefreshAt + ManualRefreshCooldown;
+        if (now >= nextAllowed)
+        {
+            return false;
+        }
+
+        SetStatus(
+            "Refresh cooling down",
+            $"Manual refresh is available again at {nextAllowed.ToLocalTime():t}.",
+            InfoBarSeverity.Informational);
+        return true;
+    }
+
+    private void ApplyRefreshBackoff(LoginTarget provider, Exception exception)
+    {
+        var message = exception.Message;
+        if (message.Contains("HTTP 401", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("HTTP 403", StringComparison.OrdinalIgnoreCase))
+        {
+            _nextBrowserRefreshAllowedAt[provider] = DateTimeOffset.MaxValue;
+            SetStatus(
+                $"{provider} sign-in required",
+                "Automatic refresh paused because the browser session is no longer authorized.",
+                InfoBarSeverity.Warning);
+            return;
+        }
+
+        var failureCount = _browserRefreshFailureCounts.TryGetValue(provider, out var currentFailures)
+            ? currentFailures + 1
+            : 1;
+        _browserRefreshFailureCounts[provider] = failureCount;
+        var delay = BackoffDelayFor(failureCount, message);
+        var nextAllowed = DateTimeOffset.UtcNow + delay;
+        _nextBrowserRefreshAllowedAt[provider] = nextAllowed;
+        SetStatus(
+            $"{provider} refresh delayed",
+            $"Keeping the last usage snapshot. Next automatic retry is after {nextAllowed.ToLocalTime():t}.",
+            InfoBarSeverity.Warning);
+    }
+
+    private static TimeSpan BackoffDelayFor(int failureCount, string message)
+    {
+        if (TryParseRetryAfter(message, out var retryAfter))
+        {
+            return retryAfter;
+        }
+
+        var exponent = Math.Min(failureCount - 1, 4);
+        var minutes = Math.Min(BackgroundRefreshBaseInterval.TotalMinutes * Math.Pow(2, exponent), MaximumRefreshBackoff.TotalMinutes);
+        return TimeSpan.FromMinutes(minutes);
+    }
+
+    private static bool TryParseRetryAfter(string message, out TimeSpan retryAfter)
+    {
+        const string marker = "Retry-After:";
+        var markerIndex = message.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            retryAfter = default;
+            return false;
+        }
+
+        var valueStart = markerIndex + marker.Length;
+        var valueEnd = message.IndexOfAny(new[] { '.', '\r', '\n' }, valueStart);
+        var value = valueEnd < 0
+            ? message[valueStart..].Trim()
+            : message[valueStart..valueEnd].Trim();
+        if (int.TryParse(value, out var seconds))
+        {
+            retryAfter = TimeSpan.FromSeconds(Math.Max(seconds, 60));
+            return true;
+        }
+
+        retryAfter = default;
+        return false;
+    }
+
+    private void ScheduleBackgroundRefresh()
+    {
+        var jitterSeconds = BackgroundRefreshBaseInterval.TotalSeconds * BackgroundRefreshJitterRatio;
+        var offsetSeconds = (Random.Shared.NextDouble() * 2d - 1d) * jitterSeconds;
+        _usageRefreshTimer.Interval = BackgroundRefreshBaseInterval + TimeSpan.FromSeconds(offsetSeconds);
+        _usageRefreshTimer.Start();
+    }
+
+    private static bool IsPolicyManagedRefresh(RefreshTrigger trigger) =>
+        trigger is RefreshTrigger.Startup or RefreshTrigger.Background or RefreshTrigger.DetailOpen or RefreshTrigger.CookieCapture or RefreshTrigger.Manual;
 
     private IEnumerable<LoginTarget> GetAvailableBrowserProviders()
     {
@@ -637,7 +818,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Hide();
     }
 
-    private void ToggleDetailWindowFromTray()
+    private async void ToggleDetailWindowFromTray()
     {
         if (_trayDetailWindow.AppWindow.IsVisible)
         {
@@ -648,6 +829,7 @@ public sealed partial class MainWindow : Window
         RefreshTraySurfaces();
         _trayDetailWindow.AppWindow.Show();
         _trayDetailWindow.Activate();
+        await RefreshCapturedUsageAsync(RefreshTrigger.DetailOpen);
     }
 
     private void ShowProbeWindow()
@@ -685,12 +867,27 @@ public sealed partial class MainWindow : Window
         Path.Combine(AppContext.BaseDirectory, "Assets", "Usage4Claude.ico");
 
     private const string StartupTaskId = "Usage4ClaudeStartup";
+    private const double BackgroundRefreshJitterRatio = 0.2d;
+    private static readonly TimeSpan BackgroundRefreshBaseInterval = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan DetailOpenRefreshStaleAfter = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ManualRefreshCooldown = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan MaximumRefreshBackoff = TimeSpan.FromHours(1);
 
     private enum LoginTarget
     {
         None,
         Claude,
         Codex,
+    }
+
+    private enum RefreshTrigger
+    {
+        Startup,
+        Background,
+        DetailOpen,
+        CookieCapture,
+        Manual,
+        ManualProbe,
     }
 
 }
