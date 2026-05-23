@@ -321,41 +321,17 @@ public sealed partial class MainWindow : Window
                 _sessionState.SetCodexWebViewSession();
             }
 
-            var providerToRestore = claudeSessionCookie is not null
-                ? LoginTarget.Claude
-                : !string.IsNullOrWhiteSpace(sessionToken)
-                    ? LoginTarget.Codex
-                    : LoginTarget.None;
-            if (providerToRestore == LoginTarget.None)
+            var recoveredProviders = GetAvailableBrowserProviders().ToList();
+            if (recoveredProviders.Count == 0)
             {
                 return;
             }
 
-            _loginTarget = providerToRestore;
-            _sessionState.ActivateBrowser(providerToRestore == LoginTarget.Claude
-                ? ProviderKind.Claude
-                : ProviderKind.Codex);
-            _suppressNavigationCookieCapture = true;
-            try
-            {
-                if (providerToRestore == LoginTarget.Claude)
-                {
-                    BrowserModeText.Text = "Claude restored session";
-                    await NavigateAndWaitAsync("https://claude.ai/settings/usage");
-                }
-                else
-                {
-                    BrowserModeText.Text = "Codex restored session";
-                    await NavigateAndWaitAsync("https://chatgpt.com/");
-                }
-            }
-            finally
-            {
-                _suppressNavigationCookieCapture = false;
-            }
-
+            BrowserModeText.Text = recoveredProviders.Count == 1
+                ? $"{recoveredProviders[0]} restored session"
+                : "Restored browser sessions";
             _usageRefreshTimer.Start();
-            await RunBrowserRefreshAsync(providerToRestore);
+            await RefreshAvailableBrowserUsageAsync();
         }
         catch (Exception exception)
         {
@@ -442,8 +418,15 @@ public sealed partial class MainWindow : Window
         }
 
         _loginTarget = target;
-        await NavigateAsync(url);
-        throw new InvalidOperationException($"Browser moved to {expectedHost}. Run the browser probe again after the page finishes loading.");
+        _suppressNavigationCookieCapture = true;
+        try
+        {
+            await NavigateAndWaitAsync(url);
+        }
+        finally
+        {
+            _suppressNavigationCookieCapture = false;
+        }
     }
 
     private async Task RunProbeAsync(string provider, Func<Task<string>> action)
@@ -463,14 +446,13 @@ public sealed partial class MainWindow : Window
 
     private Task RefreshCapturedUsageAsync()
     {
-        var activeBrowserProvider = _sessionState.Current.ActiveBrowserProvider;
-        if (activeBrowserProvider is null)
+        if (!GetAvailableBrowserProviders().Any())
         {
             SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
             return Task.CompletedTask;
         }
 
-        return RunBrowserRefreshAsync(activeBrowserProvider.Value);
+        return RefreshAvailableBrowserUsageAsync();
     }
 
     private Task RunBrowserRefreshAsync(ProviderKind provider) =>
@@ -486,22 +468,64 @@ public sealed partial class MainWindow : Window
         _refreshInProgress = true;
         try
         {
-            switch (target)
+            await RunBrowserRefreshCoreAsync(target);
+        }
+        finally
+        {
+            _refreshInProgress = false;
+        }
+    }
+
+    private async Task RefreshAvailableBrowserUsageAsync()
+    {
+        if (_refreshInProgress)
+        {
+            return;
+        }
+
+        _refreshInProgress = true;
+        try
+        {
+            foreach (var provider in GetAvailableBrowserProviders())
             {
-                case LoginTarget.Claude:
-                    await RunProbeAsync("Claude browser refresh", ProbeClaudeInBrowserAsync);
-                    break;
-                case LoginTarget.Codex:
-                    await RunProbeAsync("Codex browser refresh", ProbeCodexInBrowserAsync);
-                    break;
-                default:
-                    SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
-                    break;
+                await RunBrowserRefreshCoreAsync(provider);
             }
         }
         finally
         {
             _refreshInProgress = false;
+        }
+    }
+
+    private async Task RunBrowserRefreshCoreAsync(LoginTarget target)
+    {
+        switch (target)
+        {
+            case LoginTarget.Claude:
+                _sessionState.ActivateBrowser(ProviderKind.Claude);
+                await RunProbeAsync("Claude browser refresh", ProbeClaudeInBrowserAsync);
+                break;
+            case LoginTarget.Codex:
+                _sessionState.ActivateBrowser(ProviderKind.Codex);
+                await RunProbeAsync("Codex browser refresh", ProbeCodexInBrowserAsync);
+                break;
+            default:
+                SetStatus("Refresh unavailable", "Open a Claude or Codex browser login first.", InfoBarSeverity.Warning);
+                break;
+        }
+    }
+
+    private IEnumerable<LoginTarget> GetAvailableBrowserProviders()
+    {
+        var state = _sessionState.Current;
+        if (state.Claude == ProviderSessionSource.WebViewCookie)
+        {
+            yield return LoginTarget.Claude;
+        }
+
+        if (state.Codex == ProviderSessionSource.WebViewCookie)
+        {
+            yield return LoginTarget.Codex;
         }
     }
 
