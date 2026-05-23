@@ -7,7 +7,11 @@
           Padding="14"
           Width="336"
           Background="Transparent"
-          PointerPressed="DragSurface_PointerPressed">
+          PointerCanceled="DragSurface_PointerDragEnded"
+          PointerCaptureLost="DragSurface_PointerCaptureLost"
+          PointerMoved="DragSurface_PointerMoved"
+          PointerPressed="DragSurface_PointerPressed"
+          PointerReleased="DragSurface_PointerDragEnded">
         <StackPanel Spacing="10">
             <Grid>
                 <Grid.ColumnDefinitions>

@@ -21,6 +21,9 @@ public sealed partial class TrayDetailWindow : Window
     private readonly Func<Task> _refreshUsage;
     private readonly nint _windowHandle;
     private bool _isTopMost;
+    private bool _isDragging;
+    private Point _dragStartCursor;
+    private Rect _dragStartWindow;
 
     public TrayDetailWindow(string iconPath, Action openProbe, Func<Task> refreshUsage)
     {
@@ -104,12 +107,56 @@ public sealed partial class TrayDetailWindow : Window
     private void DragSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (e.GetCurrentPoint(DragSurface).Properties.IsLeftButtonPressed &&
-            !IsInteractiveControl(e.OriginalSource as DependencyObject))
+            !IsInteractiveControl(e.OriginalSource as DependencyObject) &&
+            GetCursorPos(out _dragStartCursor) &&
+            GetWindowRect(_windowHandle, out _dragStartWindow))
         {
-            ReleaseCapture();
-            SendMessage(_windowHandle, WindowMessage.SysCommand, new nint(SystemCommandMove), nint.Zero);
+            _isDragging = true;
+            DragSurface.CapturePointer(e.Pointer);
             e.Handled = true;
         }
+    }
+
+    private void DragSurface_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isDragging)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(DragSurface);
+        if (!point.Properties.IsLeftButtonPressed || !GetCursorPos(out var cursor))
+        {
+            EndDrag(e);
+            return;
+        }
+
+        var nextX = _dragStartWindow.Left + cursor.X - _dragStartCursor.X;
+        var nextY = _dragStartWindow.Top + cursor.Y - _dragStartCursor.Y;
+        AppWindow.Move(new Windows.Graphics.PointInt32(nextX, nextY));
+        e.Handled = true;
+    }
+
+    private void DragSurface_PointerDragEnded(object sender, PointerRoutedEventArgs e)
+    {
+        EndDrag(e);
+    }
+
+    private void DragSurface_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        _isDragging = false;
+    }
+
+    private void EndDrag(PointerRoutedEventArgs e)
+    {
+        if (!_isDragging)
+        {
+            return;
+        }
+
+        _isDragging = false;
+        DragSurface.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
     }
 
     private static bool IsInteractiveControl(DependencyObject? element)
@@ -230,14 +277,8 @@ public sealed partial class TrayDetailWindow : Window
         limit?.ResetsAt is null ? "Reset unavailable" : $"Resets {limit.ResetsAt.Value.ToLocalTime():g}";
 
     private const uint MonitorDefaultToNearest = 0x00000002;
-    private const int SystemCommandMove = 0xF012;
     private static readonly nint TopMostWindow = new(-1);
     private static readonly nint NotTopMostWindow = new(-2);
-
-    private enum WindowMessage : uint
-    {
-        SysCommand = 0x0112,
-    }
 
     [Flags]
     private enum SetWindowPosFlags : uint
@@ -295,8 +336,5 @@ public sealed partial class TrayDetailWindow : Window
         SetWindowPosFlags flags);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint SendMessage(nint windowHandle, WindowMessage message, nint wParam, nint lParam);
+    private static extern bool GetWindowRect(nint windowHandle, out Rect rect);
 }
