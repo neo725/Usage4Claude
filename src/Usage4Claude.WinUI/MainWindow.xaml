@@ -1,0 +1,133 @@
+<Window
+    x:Class="Usage4Claude.WinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Usage4Claude Spike 1">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+    <Grid Padding="16" ColumnSpacing="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="420" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+                <TextBlock FontSize="24" FontWeight="SemiBold" Text="Spike 1 Login Probe" />
+
+                <TextBlock TextWrapping="Wrap"
+                           Text="Validate WebView2 cookie capture and API access before tray and packaged system integration work." />
+
+                <ToggleSwitch x:Name="KeepInTraySwitch"
+                              Header="Keep window in notification area"
+                              IsOn="True" />
+
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Spike 3 packaged integration" />
+                <Grid ColumnSpacing="8" RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Button Content="Store Claude credential"
+                            Click="StoreClaudeCredential_Click" />
+                    <Button Grid.Column="1"
+                            Content="Load Claude credential"
+                            Click="LoadClaudeCredential_Click" />
+                    <Button Grid.Row="1"
+                            Content="Send test notification"
+                            Click="SendNotification_Click" />
+                    <Button Grid.Row="1"
+                            Grid.Column="1"
+                            Content="Enable launch at login"
+                            Click="EnableStartup_Click" />
+                </Grid>
+
+                <InfoBar x:Name="StatusBar"
+                         IsClosable="False"
+                         IsOpen="True"
+                         Severity="Informational"
+                         Title="Ready"
+                         Message="Start with Claude login or paste a Claude session key." />
+
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Claude" />
+                <TextBox x:Name="ClaudeSessionKeyBox"
+                         Header="Manual session key fallback"
+                         PlaceholderText="sk-ant-..." />
+                <TextBox x:Name="ClaudeOrganizationBox"
+                         Header="Organization UUID"
+                         PlaceholderText="Leave blank to use the first organization found" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="StartClaudeLoginButton"
+                            Content="Claude browser login"
+                            Click="StartClaudeLogin_Click" />
+                    <Button Grid.Column="1"
+                            Content="Probe Claude via browser"
+                            Click="ProbeClaude_Click" />
+                </Grid>
+
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Codex" />
+                <TextBlock TextWrapping="Wrap"
+                           Text="Codex uses the ChatGPT session cookie captured from WebView2. A manual token fallback is not planned." />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Codex browser login" Click="StartCodexLogin_Click" />
+                    <Button Grid.Column="1" Content="Probe Codex via browser" Click="ProbeCodex_Click" />
+                </Grid>
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Capture cookies now" Click="CaptureCookies_Click" />
+                    <Button Grid.Column="1" Content="Clear WebView data" Click="ClearWebViewData_Click" />
+                </Grid>
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Probe Claude via HttpClient" Click="ProbeClaudeHttp_Click" />
+                    <Button Grid.Column="1" Content="Probe Codex via HttpClient" Click="ProbeCodexHttp_Click" />
+                </Grid>
+
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Probe result" />
+                <TextBox x:Name="ProbeResultBox"
+                         AcceptsReturn="True"
+                         IsReadOnly="True"
+                         MinHeight="280"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Column="1" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="BrowserModeText"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Text="WebView2 login surface" />
+            <WebView2 x:Name="LoginWebView"
+                      Grid.Row="1"
+                      NavigationCompleted="LoginWebView_NavigationCompleted" />
+        </Grid>
+    </Grid>
+</Window>

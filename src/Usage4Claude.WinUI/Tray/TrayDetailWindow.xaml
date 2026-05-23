@@ -1,0 +1,131 @@
+<Window
+    x:Class="Usage4Claude.WinUI.Tray.TrayDetailWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Usage4Claude Detail">
+    <Grid x:Name="DragSurface"
+          Padding="14"
+          Width="336"
+          Background="Transparent"
+          PointerCanceled="DragSurface_PointerDragEnded"
+          PointerCaptureLost="DragSurface_PointerCaptureLost"
+          PointerMoved="DragSurface_PointerMoved"
+          PointerPressed="DragSurface_PointerPressed"
+          PointerReleased="DragSurface_PointerDragEnded">
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Usage4Claude" />
+                        <TextBlock x:Name="UpdatedAtText"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="Sign in and refresh usage" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                        <Button x:Name="RefreshButton"
+                                Content="Refresh"
+                                Click="RefreshUsage_Click" />
+                        <Button Content="Open"
+                                Click="OpenProbe_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Padding="10"
+                        CornerRadius="6"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="Claude" />
+                            <TextBlock x:Name="ClaudeEmptyText" Text="Not signed in" />
+                            <StackPanel x:Name="ClaudeUsagePanel" Spacing="4" Visibility="Collapsed">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="5-hour" />
+                                    <TextBlock x:Name="ClaudePrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                </Grid>
+                                <TextBlock x:Name="ClaudePrimaryResetText"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="7-day" />
+                                    <TextBlock x:Name="ClaudeSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                </Grid>
+                                <TextBlock x:Name="ClaudeSecondaryResetText"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Padding="10"
+                        CornerRadius="6"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="Codex" />
+                            <TextBlock x:Name="CodexEmptyText" Text="Not signed in" />
+                            <StackPanel x:Name="CodexUsagePanel" Spacing="4" Visibility="Collapsed">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Primary" />
+                                    <TextBlock x:Name="CodexPrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                </Grid>
+                                <TextBlock x:Name="CodexPrimaryResetText"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Secondary" />
+                                    <TextBlock x:Name="CodexSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                </Grid>
+                                <TextBlock x:Name="CodexSecondaryResetText"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ToggleButton x:Name="TopMostToggle"
+                                  MinWidth="34"
+                                  Content="Pin"
+                                  ToolTipService.ToolTip="Keep detail above other windows"
+                                  Checked="TopMostToggle_Toggled"
+                                  Unchecked="TopMostToggle_Toggled" />
+                    <Button Grid.Column="1"
+                            HorizontalAlignment="Stretch"
+                            Content="Hide detail"
+                            Click="HideDetail_Click" />
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
