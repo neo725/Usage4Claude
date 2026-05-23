@@ -827,8 +827,7 @@ public sealed partial class MainWindow : Window
         }
 
         RefreshTraySurfaces();
-        _trayDetailWindow.AppWindow.Show();
-        _trayDetailWindow.Activate();
+        _trayDetailWindow.ShowNearCursor();
         await RefreshCapturedUsageAsync(RefreshTrigger.DetailOpen);
     }
 

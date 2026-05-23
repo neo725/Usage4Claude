@@ -1,22 +1,30 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using System.Runtime.InteropServices;
 using Usage4Claude.Core.Usage;
 using Usage4Claude.WinUI.State;
+using WinRT.Interop;
 
 namespace Usage4Claude.WinUI.Tray;
 
 public sealed partial class TrayDetailWindow : Window
 {
+    private const int DetailWindowWidth = 348;
+    private const int DetailWindowHeight = 318;
+    private const int EdgeMargin = 12;
+
     private readonly Action _openProbe;
     private readonly Func<Task> _refreshUsage;
+    private readonly nint _windowHandle;
 
     public TrayDetailWindow(string iconPath, Action openProbe, Func<Task> refreshUsage)
     {
         InitializeComponent();
         _openProbe = openProbe;
         _refreshUsage = refreshUsage;
+        _windowHandle = WindowNative.GetWindowHandle(this);
         AppWindow.SetIcon(iconPath);
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(348, 318));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
 
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -54,6 +62,67 @@ public sealed partial class TrayDetailWindow : Window
     public void HideDetail()
     {
         AppWindow.Hide();
+    }
+
+    public void ShowNearCursor()
+    {
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
+        AppWindow.Move(GetCursorAnchoredPosition());
+        AppWindow.Show();
+        Activate();
+        BringToForeground();
+    }
+
+    private void BringToForeground()
+    {
+        SetWindowPos(
+            _windowHandle,
+            TopMostWindow,
+            0,
+            0,
+            0,
+            0,
+            SetWindowPosFlags.NoMove | SetWindowPosFlags.NoSize | SetWindowPosFlags.ShowWindow);
+        SetForegroundWindow(_windowHandle);
+        SetWindowPos(
+            _windowHandle,
+            NotTopMostWindow,
+            0,
+            0,
+            0,
+            0,
+            SetWindowPosFlags.NoMove | SetWindowPosFlags.NoSize | SetWindowPosFlags.ShowWindow);
+    }
+
+    private static Windows.Graphics.PointInt32 GetCursorAnchoredPosition()
+    {
+        if (!GetCursorPos(out var cursor))
+        {
+            return new Windows.Graphics.PointInt32(EdgeMargin, EdgeMargin);
+        }
+
+        var workArea = GetWorkArea(cursor);
+        var x = Math.Clamp(
+            cursor.X - DetailWindowWidth + EdgeMargin,
+            workArea.Left + EdgeMargin,
+            workArea.Right - DetailWindowWidth - EdgeMargin);
+        var y = Math.Clamp(
+            cursor.Y - DetailWindowHeight - EdgeMargin,
+            workArea.Top + EdgeMargin,
+            workArea.Bottom - DetailWindowHeight - EdgeMargin);
+        return new Windows.Graphics.PointInt32(x, y);
+    }
+
+    private static Rect GetWorkArea(Point point)
+    {
+        var monitor = MonitorFromPoint(point, MonitorDefaultToNearest);
+        var monitorInfo = new MonitorInfo
+        {
+            Size = (uint)Marshal.SizeOf<MonitorInfo>(),
+        };
+        return GetMonitorInfo(monitor, ref monitorInfo)
+            ? monitorInfo.WorkArea
+            : new Rect { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
     }
 
     internal void UpdateState(UsageState usageState, ProviderSessionState sessionState)
@@ -108,4 +177,63 @@ public sealed partial class TrayDetailWindow : Window
 
     private static string FormatReset(UsageLimit? limit) =>
         limit?.ResetsAt is null ? "Reset unavailable" : $"Resets {limit.ResetsAt.Value.ToLocalTime():g}";
+
+    private const uint MonitorDefaultToNearest = 0x00000002;
+    private static readonly nint TopMostWindow = new(-1);
+    private static readonly nint NotTopMostWindow = new(-2);
+
+    [Flags]
+    private enum SetWindowPosFlags : uint
+    {
+        NoSize = 0x0001,
+        NoMove = 0x0002,
+        ShowWindow = 0x0040,
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MonitorInfo
+    {
+        public uint Size;
+        public Rect Monitor;
+        public Rect WorkArea;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint MonitorFromPoint(Point point, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo monitorInfo);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetForegroundWindow(nint windowHandle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        nint windowHandle,
+        nint insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        SetWindowPosFlags flags);
 }
