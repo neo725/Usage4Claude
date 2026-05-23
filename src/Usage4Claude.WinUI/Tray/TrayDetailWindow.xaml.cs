@@ -1,5 +1,9 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Usage4Claude.Core.Usage;
 using Usage4Claude.WinUI.State;
@@ -16,6 +20,7 @@ public sealed partial class TrayDetailWindow : Window
     private readonly Action _openProbe;
     private readonly Func<Task> _refreshUsage;
     private readonly nint _windowHandle;
+    private bool _isTopMost;
 
     public TrayDetailWindow(string iconPath, Action openProbe, Func<Task> refreshUsage)
     {
@@ -84,14 +89,60 @@ public sealed partial class TrayDetailWindow : Window
             0,
             SetWindowPosFlags.NoMove | SetWindowPosFlags.NoSize | SetWindowPosFlags.ShowWindow);
         SetForegroundWindow(_windowHandle);
+        if (!_isTopMost)
+        {
+            SetWindowTopMost(false, showWindow: true);
+        }
+    }
+
+    private void TopMostToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        _isTopMost = TopMostToggle.IsChecked == true;
+        SetWindowTopMost(_isTopMost, showWindow: true);
+    }
+
+    private void DragSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(DragSurface).Properties.IsLeftButtonPressed &&
+            !IsInteractiveControl(e.OriginalSource as DependencyObject))
+        {
+            ReleaseCapture();
+            SendMessage(_windowHandle, WindowMessage.SysCommand, new nint(SystemCommandMove), nint.Zero);
+            e.Handled = true;
+        }
+    }
+
+    private static bool IsInteractiveControl(DependencyObject? element)
+    {
+        while (element is not null)
+        {
+            if (element is Button or ToggleButton)
+            {
+                return true;
+            }
+
+            element = VisualTreeHelper.GetParent(element);
+        }
+
+        return false;
+    }
+
+    private void SetWindowTopMost(bool isTopMost, bool showWindow)
+    {
+        var flags = SetWindowPosFlags.NoMove | SetWindowPosFlags.NoSize;
+        if (showWindow)
+        {
+            flags |= SetWindowPosFlags.ShowWindow;
+        }
+
         SetWindowPos(
             _windowHandle,
-            NotTopMostWindow,
+            isTopMost ? TopMostWindow : NotTopMostWindow,
             0,
             0,
             0,
             0,
-            SetWindowPosFlags.NoMove | SetWindowPosFlags.NoSize | SetWindowPosFlags.ShowWindow);
+            flags);
     }
 
     private static Windows.Graphics.PointInt32 GetCursorAnchoredPosition()
@@ -179,8 +230,14 @@ public sealed partial class TrayDetailWindow : Window
         limit?.ResetsAt is null ? "Reset unavailable" : $"Resets {limit.ResetsAt.Value.ToLocalTime():g}";
 
     private const uint MonitorDefaultToNearest = 0x00000002;
+    private const int SystemCommandMove = 0xF012;
     private static readonly nint TopMostWindow = new(-1);
     private static readonly nint NotTopMostWindow = new(-2);
+
+    private enum WindowMessage : uint
+    {
+        SysCommand = 0x0112,
+    }
 
     [Flags]
     private enum SetWindowPosFlags : uint
@@ -236,4 +293,10 @@ public sealed partial class TrayDetailWindow : Window
         int width,
         int height,
         SetWindowPosFlags flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SendMessage(nint windowHandle, WindowMessage message, nint wParam, nint lParam);
 }
