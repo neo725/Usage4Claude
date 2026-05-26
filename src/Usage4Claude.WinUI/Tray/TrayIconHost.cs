@@ -130,10 +130,9 @@ internal sealed class TrayIconHost : IDisposable
         try
         {
             AppendMenu(menu, MenuFlags.String, 1001, "Show detail");
-            AppendMenu(menu, MenuFlags.String, 1002, "Open probe window");
-            AppendMenu(menu, MenuFlags.String, 1003, "Cycle quota icon");
+            AppendMenu(menu, MenuFlags.String, 1002, "Open Usage4Claude");
             AppendMenu(menu, MenuFlags.Separator, 0, string.Empty);
-            AppendMenu(menu, MenuFlags.String, 1004, "Quit");
+            AppendMenu(menu, MenuFlags.String, 1003, "Quit");
             SetForegroundWindow(_windowHandle);
             var command = TrackPopupMenu(
                 menu,
@@ -153,9 +152,6 @@ internal sealed class TrayIconHost : IDisposable
                     _showSettings();
                     break;
                 case 1003:
-                    CycleQuotaIcon();
-                    break;
-                case 1004:
                     _quit();
                     break;
             }
@@ -184,9 +180,9 @@ internal sealed class TrayIconHost : IDisposable
 
         _tip = cycleStep switch
         {
-            0 => "Usage4Claude quota prototype 27%",
-            1 => "Usage4Claude quota prototype 73%",
-            2 => "Usage4Claude quota prototype 96%",
+            0 => "Usage4Claude 27% used",
+            1 => "Usage4Claude 73% used",
+            2 => "Usage4Claude 96% used",
             _ => "Usage4Claude",
         };
         ReplaceIcon(quotaIcon, ownsIconHandle: true);

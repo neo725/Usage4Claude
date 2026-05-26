@@ -5,129 +5,413 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="Usage4Claude Spike 1">
+    Title="Usage4Claude">
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
-    <Grid Padding="16" ColumnSpacing="16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="420" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="12">
-                <TextBlock FontSize="24" FontWeight="SemiBold" Text="Spike 1 Login Probe" />
+    <Grid Padding="24" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-                <TextBlock TextWrapping="Wrap"
-                           Text="Validate WebView2 cookie capture and API access before tray and packaged system integration work." />
-
-                <ToggleSwitch x:Name="KeepInTraySwitch"
-                              Header="Keep window in notification area"
-                              IsOn="True" />
-
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Spike 3 packaged integration" />
-                <Grid ColumnSpacing="8" RowSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Button Content="Store Claude credential"
-                            Click="StoreClaudeCredential_Click" />
-                    <Button Grid.Column="1"
-                            Content="Load Claude credential"
-                            Click="LoadClaudeCredential_Click" />
-                    <Button Grid.Row="1"
-                            Content="Send test notification"
-                            Click="SendNotification_Click" />
-                    <Button Grid.Row="1"
-                            Grid.Column="1"
-                            Content="Enable launch at login"
-                            Click="EnableStartup_Click" />
-                </Grid>
-
-                <InfoBar x:Name="StatusBar"
-                         IsClosable="False"
-                         IsOpen="True"
-                         Severity="Informational"
-                         Title="Ready"
-                         Message="Start with Claude login or paste a Claude session key." />
-
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Claude" />
-                <TextBox x:Name="ClaudeSessionKeyBox"
-                         Header="Manual session key fallback"
-                         PlaceholderText="sk-ant-..." />
-                <TextBox x:Name="ClaudeOrganizationBox"
-                         Header="Organization UUID"
-                         PlaceholderText="Leave blank to use the first organization found" />
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="StartClaudeLoginButton"
-                            Content="Claude browser login"
-                            Click="StartClaudeLogin_Click" />
-                    <Button Grid.Column="1"
-                            Content="Probe Claude via browser"
-                            Click="ProbeClaude_Click" />
-                </Grid>
-
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Codex" />
-                <TextBlock TextWrapping="Wrap"
-                           Text="Codex uses the ChatGPT session cookie captured from WebView2. A manual token fallback is not planned." />
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button Content="Codex browser login" Click="StartCodexLogin_Click" />
-                    <Button Grid.Column="1" Content="Probe Codex via browser" Click="ProbeCodex_Click" />
-                </Grid>
-
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button Content="Capture cookies now" Click="CaptureCookies_Click" />
-                    <Button Grid.Column="1" Content="Clear WebView data" Click="ClearWebViewData_Click" />
-                </Grid>
-
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button Content="Probe Claude via HttpClient" Click="ProbeClaudeHttp_Click" />
-                    <Button Grid.Column="1" Content="Probe Codex via HttpClient" Click="ProbeCodexHttp_Click" />
-                </Grid>
-
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Probe result" />
-                <TextBox x:Name="ProbeResultBox"
-                         AcceptsReturn="True"
-                         IsReadOnly="True"
-                         MinHeight="280"
-                         TextWrapping="Wrap" />
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock FontSize="28" FontWeight="SemiBold" Text="Usage4Claude" />
+                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Text="Claude and Codex quota monitor for Windows" />
             </StackPanel>
-        </ScrollViewer>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        VerticalAlignment="Center">
+                <ToggleSwitch x:Name="KeepInTraySwitch"
+                              Header="Stay in tray"
+                              IsOn="True"
+                              Toggled="KeepInTraySwitch_Toggled" />
+                <Button Content="Refresh usage"
+                        Click="RefreshUsage_Click" />
+            </StackPanel>
+        </Grid>
 
-        <Grid Grid.Column="1" RowSpacing="8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="BrowserModeText"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Text="WebView2 login surface" />
-            <WebView2 x:Name="LoginWebView"
-                      Grid.Row="1"
-                      NavigationCompleted="LoginWebView_NavigationCompleted" />
+        <Grid Grid.Row="1" ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                    <InfoBar x:Name="StatusBar"
+                             IsClosable="False"
+                             IsOpen="True"
+                             Severity="Informational"
+                             Title="Ready"
+                             Message="Sign in to Claude or Codex to start monitoring usage." />
+
+                    <Border Padding="14"
+                            CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Usage" />
+                                    <TextBlock x:Name="LastUpdatedText"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="No usage snapshot yet" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="Claude" />
+                                    <TextBlock x:Name="ClaudeStatusText"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="Not signed in" />
+                                    <TextBlock x:Name="ClaudeUsageSummaryText"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               Text="--" />
+                                    <TextBlock x:Name="ClaudeUsageDetailText"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="Codex" />
+                                    <TextBlock x:Name="CodexStatusText"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="Not signed in" />
+                                    <TextBlock x:Name="CodexUsageSummaryText"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               Text="--" />
+                                    <TextBlock x:Name="CodexUsageDetailText"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="14"
+                            CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <StackPanel Spacing="12">
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Accounts" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="StartClaudeLoginButton"
+                                        Content="Sign in to Claude"
+                                        HorizontalAlignment="Stretch"
+                                        Click="StartClaudeLogin_Click" />
+                                <Button Grid.Column="1"
+                                        Content="Sign in to Codex"
+                                        HorizontalAlignment="Stretch"
+                                        Click="StartCodexLogin_Click" />
+                            </Grid>
+                            <TextBox x:Name="ClaudeSessionKeyBox"
+                                     Header="Claude session key fallback"
+                                     PlaceholderText="Optional manual fallback" />
+                            <TextBox x:Name="ClaudeOrganizationBox"
+                                     Header="Claude organization"
+                                     PlaceholderText="Use the first organization when blank" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Store Claude credential"
+                                        HorizontalAlignment="Stretch"
+                                        Click="StoreClaudeCredential_Click" />
+                                <Button Grid.Column="1"
+                                        Content="Load Claude credential"
+                                        HorizontalAlignment="Stretch"
+                                        Click="LoadClaudeCredential_Click" />
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" Text="Claude account" />
+                                    <TextBlock x:Name="ClaudeAccountDetailText"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="No account connected" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" Text="Codex account" />
+                                    <TextBlock x:Name="CodexAccountDetailText"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="No account connected" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock FontWeight="SemiBold" Text="Profiles" />
+                            <ListView x:Name="ProfilesList"
+                                      MaxHeight="112"
+                                      SelectionChanged="ProfileSelection_Changed" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Claude account in this profile" />
+                                    <ListView x:Name="ClaudeAccountsList"
+                                              MaxHeight="132"
+                                              SelectionChanged="AccountSelection_Changed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="8">
+                                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Codex account in this profile" />
+                                    <ListView x:Name="CodexAccountsList"
+                                              MaxHeight="132"
+                                              SelectionChanged="AccountSelection_Changed" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="AccountAliasBox"
+                                         Header="Profile name"
+                                         PlaceholderText="Name this profile, such as Work or Personal" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Bottom">
+                                    <Button Content="Save profile"
+                                            Click="SaveProfile_Click" />
+                                    <Button Content="New profile"
+                                            Click="NewProfile_Click" />
+                                    <Button Content="Delete profile"
+                                            Click="DeleteProfile_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="14"
+                            CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <StackPanel Spacing="12">
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Settings" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="DisplayModeComboBox"
+                                          Header="Display mode"
+                                          SelectedIndex="0"
+                                          SelectionChanged="DisplaySettings_Changed">
+                                    <ComboBoxItem Content="Smart display" />
+                                    <ComboBoxItem Content="Custom display" />
+                                </ComboBox>
+                                <ComboBox x:Name="DetailTimeModeComboBox"
+                                          Grid.Column="1"
+                                          Header="Detail time"
+                                          SelectedIndex="0"
+                                          SelectionChanged="DisplaySettings_Changed">
+                                    <ComboBoxItem Content="Reset time" />
+                                    <ComboBoxItem Content="Time remaining" />
+                                </ComboBox>
+                            </Grid>
+                            <StackPanel x:Name="CustomDisplayPanel" Spacing="8" Visibility="Collapsed">
+                                <TextBlock FontWeight="SemiBold" Text="Visible limits" />
+                                <Grid ColumnSpacing="10" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <CheckBox x:Name="ShowFiveHourCheckBox"
+                                              Content="Claude 5-hour"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowSevenDayCheckBox"
+                                              Grid.Column="1"
+                                              Content="Claude 7-day"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowExtraUsageCheckBox"
+                                              Grid.Row="1"
+                                              Content="Claude Extra Usage"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowOpusCheckBox"
+                                              Grid.Row="1"
+                                              Grid.Column="1"
+                                              Content="Claude Opus"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowSonnetCheckBox"
+                                              Grid.Row="2"
+                                              Content="Claude Sonnet"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowCodexPrimaryCheckBox"
+                                              Grid.Row="2"
+                                              Grid.Column="1"
+                                              Content="Codex primary"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowCodexSecondaryCheckBox"
+                                              Grid.Row="3"
+                                              Content="Codex secondary"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                    <CheckBox x:Name="ShowCodexCreditsCheckBox"
+                                              Grid.Row="3"
+                                              Grid.Column="1"
+                                              Content="Codex credits"
+                                              IsChecked="True"
+                                              Checked="DisplaySettings_Changed"
+                                              Unchecked="DisplaySettings_Changed" />
+                                </Grid>
+                            </StackPanel>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="AppearanceComboBox"
+                                          Header="Appearance"
+                                          SelectedIndex="0"
+                                          SelectionChanged="DisplaySettings_Changed">
+                                    <ComboBoxItem Content="Follow Windows" />
+                                    <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Dark" />
+                                </ComboBox>
+                                <ToggleSwitch x:Name="ColoredThemeSwitch"
+                                              Grid.Column="1"
+                                              Header="Colored indicators"
+                                              OffContent="Monochrome"
+                                              OnContent="Colored"
+                                              Toggled="DisplaySettings_Changed" />
+                            </Grid>
+                            <ToggleSwitch Header="Keep Usage4Claude running when the window closes"
+                                          IsOn="{Binding IsOn, ElementName=KeepInTraySwitch, Mode=TwoWay}" />
+                            <Button Content="Enable launch at login"
+                                    HorizontalAlignment="Stretch"
+                                    Click="EnableStartup_Click" />
+                            <Button Content="Send test notification"
+                                    HorizontalAlignment="Stretch"
+                                    Click="SendNotification_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Expander Header="Diagnostics">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Capture cookies"
+                                        HorizontalAlignment="Stretch"
+                                        Click="CaptureCookies_Click" />
+                                <Button Grid.Column="1"
+                                        Content="Clear browser data"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ClearWebViewData_Click" />
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Refresh Claude"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ProbeClaude_Click" />
+                                <Button Grid.Column="1"
+                                        Content="Refresh Codex"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ProbeCodex_Click" />
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Claude HttpClient"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ProbeClaudeHttp_Click" />
+                                <Button Grid.Column="1"
+                                        Content="Codex HttpClient"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ProbeCodexHttp_Click" />
+                            </Grid>
+                            <TextBox x:Name="ProbeResultBox"
+                                     Header="Diagnostic output"
+                                     AcceptsReturn="True"
+                                     IsReadOnly="True"
+                                     MinHeight="180"
+                                     TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Grid Grid.Column="1" RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="BrowserModeText"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Browser sign-in" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="Use the embedded browser to authorize usage refreshes." />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Content="Open tray detail"
+                            VerticalAlignment="Center"
+                            Click="OpenTrayDetail_Click" />
+                </Grid>
+                <Border Grid.Row="1"
+                        CornerRadius="8"
+                        BorderThickness="1"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                    <WebView2 x:Name="LoginWebView"
+                              NavigationCompleted="LoginWebView_NavigationCompleted" />
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
