@@ -263,6 +263,9 @@ public sealed partial class TrayDetailWindow : Window
             return;
         }
 
+        ClaudeRing.PrimaryPercentage = usage.FiveHour?.Percentage ?? 0;
+        ClaudeRing.SecondaryPercentage = usage.SevenDay?.Percentage ?? 0;
+
         var showFiveHour = ShouldShow(_displaySettings.ShowFiveHour, usage.FiveHour is not null);
         ClaudePrimaryRow.Visibility = showFiveHour ? Visibility.Visible : Visibility.Collapsed;
         ClaudePrimaryText.Text = FormatPercentage(usage.FiveHour);
