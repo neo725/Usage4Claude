@@ -26,7 +26,9 @@ public sealed partial class TrayDetailWindow : Window
     private Point _dragStartCursor;
     private Rect _dragStartWindow;
 
-    public TrayDetailWindow(string iconPath, Action openProbe, Func<Task> refreshUsage)
+    public bool IsTopMost => _isTopMost;
+
+    public TrayDetailWindow(string iconPath, bool initialTopMost, Action openProbe, Func<Task> refreshUsage)
     {
         InitializeComponent();
         _openProbe = openProbe;
@@ -41,6 +43,13 @@ public sealed partial class TrayDetailWindow : Window
             presenter.IsMaximizable = false;
             presenter.IsMinimizable = false;
             presenter.SetBorderAndTitleBar(false, false);
+        }
+
+        TopMostToggle.IsOn = initialTopMost;
+        _isTopMost = initialTopMost;
+        if (initialTopMost)
+        {
+            SetWindowTopMost(true, showWindow: false);
         }
     }
 
