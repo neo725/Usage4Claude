@@ -14,7 +14,7 @@ namespace Usage4Claude.WinUI.Tray;
 public sealed partial class TrayDetailWindow : Window
 {
     private const int DetailWindowWidth = 348;
-    private const int DetailWindowHeight = 350;
+    private const int DetailWindowHeight = 395;
     private const int EdgeMargin = 12;
 
     private readonly Action _openProbe;
