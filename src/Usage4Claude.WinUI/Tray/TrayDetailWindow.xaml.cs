@@ -14,12 +14,13 @@ namespace Usage4Claude.WinUI.Tray;
 public sealed partial class TrayDetailWindow : Window
 {
     private const int DetailWindowWidth = 348;
-    private const int DetailWindowHeight = 420;
+    private const int DetailWindowHeight = 350;
     private const int EdgeMargin = 12;
 
     private readonly Action _openProbe;
     private readonly Func<Task> _refreshUsage;
     private readonly nint _windowHandle;
+    private DisplaySettings _displaySettings = DisplaySettings.Default;
     private bool _isTopMost;
     private bool _isDragging;
     private Point _dragStartCursor;
@@ -100,7 +101,7 @@ public sealed partial class TrayDetailWindow : Window
 
     private void TopMostToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        _isTopMost = TopMostToggle.IsChecked == true;
+        _isTopMost = TopMostToggle.IsOn;
         SetWindowTopMost(_isTopMost, showWindow: true);
     }
 
@@ -233,6 +234,11 @@ public sealed partial class TrayDetailWindow : Window
         UpdateCodex(usageState.Codex, sessionState.HasCodex);
     }
 
+    internal void UpdateDisplaySettings(DisplaySettings displaySettings)
+    {
+        _displaySettings = displaySettings;
+    }
+
     private void UpdateClaude(ClaudeUsageSnapshot? usage, ProviderSessionSource sessionSource)
     {
         ClaudeEmptyText.Visibility = usage is null ? Visibility.Visible : Visibility.Collapsed;
@@ -248,10 +254,35 @@ public sealed partial class TrayDetailWindow : Window
             return;
         }
 
+        var showFiveHour = ShouldShow(_displaySettings.ShowFiveHour, usage.FiveHour is not null);
+        ClaudePrimaryRow.Visibility = showFiveHour ? Visibility.Visible : Visibility.Collapsed;
         ClaudePrimaryText.Text = FormatPercentage(usage.FiveHour);
-        ClaudePrimaryResetText.Text = FormatReset(usage.FiveHour);
+        ClaudePrimaryResetText.Text = FormatTime(usage.FiveHour);
+        ClaudePrimaryBar.Value = usage.FiveHour?.Percentage ?? 0;
+
+        var showSevenDay = ShouldShow(_displaySettings.ShowSevenDay, usage.SevenDay is not null);
+        ClaudeSecondaryRow.Visibility = showSevenDay ? Visibility.Visible : Visibility.Collapsed;
         ClaudeSecondaryText.Text = FormatPercentage(usage.SevenDay);
-        ClaudeSecondaryResetText.Text = FormatReset(usage.SevenDay);
+        ClaudeSecondaryResetText.Text = FormatTime(usage.SevenDay);
+        ClaudeSecondaryBar.Value = usage.SevenDay?.Percentage ?? 0;
+
+        var showExtra = ShouldShow(_displaySettings.ShowExtraUsage, usage.ExtraUsage?.Enabled == true);
+        ClaudeExtraRow.Visibility = showExtra ? Visibility.Visible : Visibility.Collapsed;
+        ClaudeExtraText.Text = FormatExtraUsage(usage.ExtraUsage);
+        ClaudeExtraBar.Value = (double)(usage.ExtraUsage?.Percentage ?? 0);
+
+        var showOpus = ShouldShow(_displaySettings.ShowOpus, usage.OpusWeekly is not null);
+        ClaudeOpusRow.Visibility = showOpus ? Visibility.Visible : Visibility.Collapsed;
+        ClaudeOpusText.Text = FormatPercentage(usage.OpusWeekly);
+        ClaudeOpusResetText.Text = FormatTime(usage.OpusWeekly);
+        ClaudeOpusBar.Value = usage.OpusWeekly?.Percentage ?? 0;
+
+        var showSonnet = ShouldShow(_displaySettings.ShowSonnet, usage.SonnetWeekly is not null);
+        ClaudeSonnetRow.Visibility = showSonnet ? Visibility.Visible : Visibility.Collapsed;
+        ClaudeSonnetText.Text = FormatPercentage(usage.SonnetWeekly);
+        ClaudeSonnetResetText.Text = FormatTime(usage.SonnetWeekly);
+        ClaudeSonnetBar.Value = usage.SonnetWeekly?.Percentage ?? 0;
+        ApplyIndicatorTheme(ClaudePrimaryText, ClaudeSecondaryText, ClaudeExtraText, ClaudeOpusText, ClaudeSonnetText);
     }
 
     private void UpdateCodex(CodexUsageSnapshot? usage, bool hasSession)
@@ -264,17 +295,101 @@ public sealed partial class TrayDetailWindow : Window
             return;
         }
 
+        var showPrimary = ShouldShow(_displaySettings.ShowCodexPrimary, usage.Primary is not null);
+        CodexPrimaryRow.Visibility = showPrimary ? Visibility.Visible : Visibility.Collapsed;
         CodexPrimaryText.Text = FormatPercentage(usage.Primary);
-        CodexPrimaryResetText.Text = FormatReset(usage.Primary);
+        CodexPrimaryResetText.Text = FormatTime(usage.Primary);
+        CodexPrimaryBar.Value = usage.Primary?.Percentage ?? 0;
+
+        var showSecondary = ShouldShow(_displaySettings.ShowCodexSecondary, usage.Secondary is not null);
+        CodexSecondaryRow.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
         CodexSecondaryText.Text = FormatPercentage(usage.Secondary);
-        CodexSecondaryResetText.Text = FormatReset(usage.Secondary);
+        CodexSecondaryResetText.Text = FormatTime(usage.Secondary);
+        CodexSecondaryBar.Value = usage.Secondary?.Percentage ?? 0;
+
+        var showCredits = ShouldShow(_displaySettings.ShowCodexCredits, usage.Credits?.Enabled == true);
+        CodexCreditsRow.Visibility = showCredits ? Visibility.Visible : Visibility.Collapsed;
+        CodexCreditsText.Text = FormatCodexCredits(usage.Credits);
+        ApplyIndicatorTheme(CodexPrimaryText, CodexSecondaryText, CodexCreditsText);
     }
+
+    private bool ShouldShow(bool customEnabled, bool hasData) =>
+        hasData && (_displaySettings.DisplayMode == DisplayMode.Smart || customEnabled);
 
     private static string FormatPercentage(UsageLimit? limit) =>
         limit is null ? "--" : $"{limit.Percentage:0.#}%";
 
-    private static string FormatReset(UsageLimit? limit) =>
-        limit?.ResetsAt is null ? "Reset unavailable" : $"Resets {limit.ResetsAt.Value.ToLocalTime():g}";
+    private string FormatTime(UsageLimit? limit)
+    {
+        if (limit?.ResetsAt is null)
+        {
+            return _displaySettings.DetailTimeMode == DetailTimeMode.TimeRemaining
+                ? "Remaining unavailable"
+                : "Reset unavailable";
+        }
+
+        if (_displaySettings.DetailTimeMode == DetailTimeMode.ResetTime)
+        {
+            return $"Resets {limit.ResetsAt.Value.ToLocalTime():g}";
+        }
+
+        var remaining = limit.ResetsAt.Value - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return "Ready to reset";
+        }
+
+        return remaining.TotalHours >= 1
+            ? $"{(int)remaining.TotalHours}h {remaining.Minutes}m remaining"
+            : $"{Math.Max(1, remaining.Minutes)}m remaining";
+    }
+
+    private static string FormatExtraUsage(ClaudeExtraUsageSnapshot? extraUsage)
+    {
+        if (extraUsage is null || !extraUsage.Enabled)
+        {
+            return "--";
+        }
+
+        if (extraUsage.Used is null || extraUsage.Limit is null)
+        {
+            return "Enabled";
+        }
+
+        return $"{extraUsage.Currency}{extraUsage.Used:0.##}/{extraUsage.Limit:0.##}";
+    }
+
+    private static string FormatCodexCredits(CodexCreditsSnapshot? credits)
+    {
+        if (credits is null || !credits.Enabled)
+        {
+            return "--";
+        }
+
+        if (credits.Unlimited)
+        {
+            return "Unlimited";
+        }
+
+        if (credits.OverageLimitReached || credits.SpendControlReached)
+        {
+            return "Limit reached";
+        }
+
+        return credits.Balance is null ? "Available" : $"{credits.Balance:0.##}";
+    }
+
+    private void ApplyIndicatorTheme(params TextBlock[] values)
+    {
+        var brush = _displaySettings.UseColoredTheme
+            ? (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"]
+            : (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+
+        foreach (var value in values)
+        {
+            value.Foreground = brush;
+        }
+    }
 
     private const uint MonitorDefaultToNearest = 0x00000002;
     private static readonly nint TopMostWindow = new(-1);

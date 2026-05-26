@@ -46,27 +46,128 @@
                         <StackPanel Spacing="2">
                             <TextBlock FontWeight="SemiBold" Text="Claude" />
                             <TextBlock x:Name="ClaudeEmptyText" Text="Not signed in" />
-                            <StackPanel x:Name="ClaudeUsagePanel" Spacing="4" Visibility="Collapsed">
-                                <Grid ColumnSpacing="8">
+                            <StackPanel x:Name="ClaudeUsagePanel" Spacing="6" Visibility="Collapsed">
+                                <Grid x:Name="ClaudePrimaryRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="5-hour" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="ClaudePrimaryBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ClaudePrimaryText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudePrimaryResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                                <Grid x:Name="ClaudeSecondaryRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="7-day" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="ClaudeSecondaryBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ClaudeSecondaryText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeSecondaryResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                                <Grid x:Name="ClaudeExtraRow" ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="5-hour" />
-                                    <TextBlock x:Name="ClaudePrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                    <TextBlock Text="Extra Usage" VerticalAlignment="Center" />
+                                    <ProgressBar x:Name="ClaudeExtraBar"
+                                                 Grid.Column="1"
+                                                 Maximum="100"
+                                                 Height="6"
+                                                 VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ClaudeExtraText"
+                                               Grid.Column="2"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudePrimaryResetText"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="7-day" />
-                                    <TextBlock x:Name="ClaudeSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                <Grid x:Name="ClaudeOpusRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Opus" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="ClaudeOpusBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ClaudeOpusText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeOpusResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudeSecondaryResetText"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Grid x:Name="ClaudeSonnetRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Sonnet" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="ClaudeSonnetBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ClaudeSonnetText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeSonnetResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -83,27 +184,67 @@
                         <StackPanel Spacing="2">
                             <TextBlock FontWeight="SemiBold" Text="Codex" />
                             <TextBlock x:Name="CodexEmptyText" Text="Not signed in" />
-                            <StackPanel x:Name="CodexUsagePanel" Spacing="4" Visibility="Collapsed">
-                                <Grid ColumnSpacing="8">
+                            <StackPanel x:Name="CodexUsagePanel" Spacing="6" Visibility="Collapsed">
+                                <Grid x:Name="CodexPrimaryRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Primary" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="CodexPrimaryBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="CodexPrimaryText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexPrimaryResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                                <Grid x:Name="CodexSecondaryRow" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Secondary" VerticalAlignment="Center" />
+                                        <ProgressBar x:Name="CodexSecondaryBar"
+                                                     Grid.Column="1"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock x:Name="CodexSecondaryText"
+                                                   Grid.Column="2"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexSecondaryResetText"
+                                               Grid.Row="1"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                                <Grid x:Name="CodexCreditsRow" ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Primary" />
-                                    <TextBlock x:Name="CodexPrimaryText" Grid.Column="1" FontWeight="SemiBold" />
+                                    <TextBlock Text="Credits" />
+                                    <TextBlock x:Name="CodexCreditsText" Grid.Column="1" FontWeight="SemiBold" />
                                 </Grid>
-                                <TextBlock x:Name="CodexPrimaryResetText"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Secondary" />
-                                    <TextBlock x:Name="CodexSecondaryText" Grid.Column="1" FontWeight="SemiBold" />
-                                </Grid>
-                                <TextBlock x:Name="CodexSecondaryResetText"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -114,12 +255,10 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <ToggleButton x:Name="TopMostToggle"
-                                  MinWidth="34"
-                                  Content="Pin"
-                                  ToolTipService.ToolTip="Keep detail above other windows"
-                                  Checked="TopMostToggle_Toggled"
-                                  Unchecked="TopMostToggle_Toggled" />
+                    <ToggleSwitch x:Name="TopMostToggle"
+                                 Header="TopMost"
+                                 ToolTipService.ToolTip="TopMost"
+                                 Toggled="TopMostToggle_Toggled" />
                     <Button Grid.Column="1"
                             HorizontalAlignment="Stretch"
                             Content="Hide detail"
