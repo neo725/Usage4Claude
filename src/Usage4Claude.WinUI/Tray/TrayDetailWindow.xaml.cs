@@ -19,20 +19,26 @@ public sealed partial class TrayDetailWindow : Window
 
     private readonly Action _openProbe;
     private readonly Func<Task> _refreshUsage;
+    private readonly Action<ProgressBarMode> _onProgressBarModeChanged;
     private readonly nint _windowHandle;
     private DisplaySettings _displaySettings = DisplaySettings.Default;
+    private UsageState? _lastUsageState;
+    private ProviderSessionState _lastSessionState = ProviderSessionState.Empty;
     private bool _isTopMost;
     private bool _isDragging;
+    private bool _syncingProgressMode;
     private Point _dragStartCursor;
     private Rect _dragStartWindow;
 
     public bool IsTopMost => _isTopMost;
 
-    public TrayDetailWindow(string iconPath, bool initialTopMost, Action openProbe, Func<Task> refreshUsage)
+    internal TrayDetailWindow(string iconPath, bool initialTopMost, Action openProbe,
+        Func<Task> refreshUsage, Action<ProgressBarMode> onProgressBarModeChanged)
     {
         InitializeComponent();
         _openProbe = openProbe;
         _refreshUsage = refreshUsage;
+        _onProgressBarModeChanged = onProgressBarModeChanged;
         _windowHandle = WindowNative.GetWindowHandle(this);
         AppWindow.SetIcon(iconPath);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
@@ -106,6 +112,33 @@ public sealed partial class TrayDetailWindow : Window
         {
             SetWindowTopMost(false, showWindow: true);
         }
+    }
+
+    private void ProgressMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingProgressMode || TimeModeRadio is null)
+        {
+            return;
+        }
+
+        var mode = TimeModeRadio.IsChecked == true ? ProgressBarMode.TimeElapsed : ProgressBarMode.Usage;
+        _onProgressBarModeChanged(mode);
+    }
+
+    private double ComputeBarValue(UsageLimit? limit)
+    {
+        if (_displaySettings.ProgressBarMode == ProgressBarMode.TimeElapsed
+            && limit?.WindowDuration is not null
+            && limit.ResetsAt is not null)
+        {
+            var start = limit.ResetsAt.Value - limit.WindowDuration.Value;
+            var elapsed = DateTimeOffset.UtcNow - start;
+            return Math.Clamp(
+                elapsed.TotalSeconds / limit.WindowDuration.Value.TotalSeconds * 100,
+                0, 100);
+        }
+
+        return limit?.Percentage ?? 0;
     }
 
     private void TopMostToggle_Toggled(object sender, RoutedEventArgs e)
@@ -235,17 +268,41 @@ public sealed partial class TrayDetailWindow : Window
 
     internal void UpdateState(UsageState usageState, ProviderSessionState sessionState)
     {
-        UpdatedAtText.Text = usageState.UpdatedAt is null
-            ? "Sign in and refresh usage"
-            : $"Updated {usageState.UpdatedAt.Value.ToLocalTime():t}";
+        _lastUsageState = usageState;
+        _lastSessionState = sessionState;
+        RenderState();
+    }
 
-        UpdateClaude(usageState.Claude, sessionState.Claude);
-        UpdateCodex(usageState.Codex, sessionState.HasCodex);
+    private void RenderState()
+    {
+        if (_lastUsageState is null)
+        {
+            return;
+        }
+
+        UpdatedAtText.Text = _lastUsageState.UpdatedAt is null
+            ? "Sign in and refresh usage"
+            : $"Updated {_lastUsageState.UpdatedAt.Value.ToLocalTime():t}";
+
+        UpdateClaude(_lastUsageState.Claude, _lastSessionState.Claude);
+        UpdateCodex(_lastUsageState.Codex, _lastSessionState.HasCodex);
     }
 
     internal void UpdateDisplaySettings(DisplaySettings displaySettings)
     {
         _displaySettings = displaySettings;
+        _syncingProgressMode = true;
+        try
+        {
+            UsageModeRadio.IsChecked = displaySettings.ProgressBarMode == ProgressBarMode.Usage;
+            TimeModeRadio.IsChecked = displaySettings.ProgressBarMode == ProgressBarMode.TimeElapsed;
+        }
+        finally
+        {
+            _syncingProgressMode = false;
+        }
+
+        RenderState();
     }
 
     private void UpdateClaude(ClaudeUsageSnapshot? usage, ProviderSessionSource sessionSource)
@@ -268,15 +325,15 @@ public sealed partial class TrayDetailWindow : Window
 
         var showFiveHour = ShouldShow(_displaySettings.ShowFiveHour, usage.FiveHour is not null);
         ClaudePrimaryRow.Visibility = showFiveHour ? Visibility.Visible : Visibility.Collapsed;
-        ClaudePrimaryText.Text = FormatPercentage(usage.FiveHour);
+        ClaudePrimaryText.Text = FormatBarText(usage.FiveHour);
         ClaudePrimaryResetText.Text = FormatTime(usage.FiveHour);
-        ClaudePrimaryBar.Value = usage.FiveHour?.Percentage ?? 0;
+        ClaudePrimaryBar.Value = ComputeBarValue(usage.FiveHour);
 
         var showSevenDay = ShouldShow(_displaySettings.ShowSevenDay, usage.SevenDay is not null);
         ClaudeSecondaryRow.Visibility = showSevenDay ? Visibility.Visible : Visibility.Collapsed;
-        ClaudeSecondaryText.Text = FormatPercentage(usage.SevenDay);
+        ClaudeSecondaryText.Text = FormatBarText(usage.SevenDay);
         ClaudeSecondaryResetText.Text = FormatTime(usage.SevenDay);
-        ClaudeSecondaryBar.Value = usage.SevenDay?.Percentage ?? 0;
+        ClaudeSecondaryBar.Value = ComputeBarValue(usage.SevenDay);
 
         var showExtra = ShouldShow(_displaySettings.ShowExtraUsage, usage.ExtraUsage?.Enabled == true);
         ClaudeExtraRow.Visibility = showExtra ? Visibility.Visible : Visibility.Collapsed;
@@ -285,15 +342,15 @@ public sealed partial class TrayDetailWindow : Window
 
         var showOpus = ShouldShow(_displaySettings.ShowOpus, usage.OpusWeekly is not null);
         ClaudeOpusRow.Visibility = showOpus ? Visibility.Visible : Visibility.Collapsed;
-        ClaudeOpusText.Text = FormatPercentage(usage.OpusWeekly);
+        ClaudeOpusText.Text = FormatBarText(usage.OpusWeekly);
         ClaudeOpusResetText.Text = FormatTime(usage.OpusWeekly);
-        ClaudeOpusBar.Value = usage.OpusWeekly?.Percentage ?? 0;
+        ClaudeOpusBar.Value = ComputeBarValue(usage.OpusWeekly);
 
         var showSonnet = ShouldShow(_displaySettings.ShowSonnet, usage.SonnetWeekly is not null);
         ClaudeSonnetRow.Visibility = showSonnet ? Visibility.Visible : Visibility.Collapsed;
-        ClaudeSonnetText.Text = FormatPercentage(usage.SonnetWeekly);
+        ClaudeSonnetText.Text = FormatBarText(usage.SonnetWeekly);
         ClaudeSonnetResetText.Text = FormatTime(usage.SonnetWeekly);
-        ClaudeSonnetBar.Value = usage.SonnetWeekly?.Percentage ?? 0;
+        ClaudeSonnetBar.Value = ComputeBarValue(usage.SonnetWeekly);
         ApplyIndicatorTheme(ClaudePrimaryText, ClaudeSecondaryText, ClaudeExtraText, ClaudeOpusText, ClaudeSonnetText);
     }
 
@@ -309,15 +366,15 @@ public sealed partial class TrayDetailWindow : Window
 
         var showPrimary = ShouldShow(_displaySettings.ShowCodexPrimary, usage.Primary is not null);
         CodexPrimaryRow.Visibility = showPrimary ? Visibility.Visible : Visibility.Collapsed;
-        CodexPrimaryText.Text = FormatPercentage(usage.Primary);
+        CodexPrimaryText.Text = FormatBarText(usage.Primary);
         CodexPrimaryResetText.Text = FormatTime(usage.Primary);
-        CodexPrimaryBar.Value = usage.Primary?.Percentage ?? 0;
+        CodexPrimaryBar.Value = ComputeBarValue(usage.Primary);
 
         var showSecondary = ShouldShow(_displaySettings.ShowCodexSecondary, usage.Secondary is not null);
         CodexSecondaryRow.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
-        CodexSecondaryText.Text = FormatPercentage(usage.Secondary);
+        CodexSecondaryText.Text = FormatBarText(usage.Secondary);
         CodexSecondaryResetText.Text = FormatTime(usage.Secondary);
-        CodexSecondaryBar.Value = usage.Secondary?.Percentage ?? 0;
+        CodexSecondaryBar.Value = ComputeBarValue(usage.Secondary);
 
         var showCredits = ShouldShow(_displaySettings.ShowCodexCredits, usage.Credits?.Enabled == true);
         CodexCreditsRow.Visibility = showCredits ? Visibility.Visible : Visibility.Collapsed;
@@ -329,7 +386,20 @@ public sealed partial class TrayDetailWindow : Window
         hasData && (_displaySettings.DisplayMode == DisplayMode.Smart || customEnabled);
 
     private static string FormatPercentage(UsageLimit? limit) =>
-        limit is null ? "--" : $"{limit.Percentage:0.#}%";
+        limit is null ? "--" : $"{limit.Percentage:0.#}% used";
+
+    private string FormatBarText(UsageLimit? limit)
+    {
+        if (_displaySettings.ProgressBarMode == ProgressBarMode.TimeElapsed
+            && limit?.WindowDuration is not null
+            && limit.ResetsAt is not null)
+        {
+            var value = ComputeBarValue(limit);
+            return $"{value:0.#}%";
+        }
+
+        return FormatPercentage(limit);
+    }
 
     private string FormatTime(UsageLimit? limit)
     {
