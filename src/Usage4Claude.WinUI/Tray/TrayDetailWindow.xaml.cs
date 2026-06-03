@@ -16,6 +16,7 @@ public sealed partial class TrayDetailWindow : Window
     private const int DetailWindowWidth = 348;
     private const int DetailWindowHeight = 395;
     private const int EdgeMargin = 12;
+    private const int EdgeSnapThreshold = 15;
 
     private readonly Action _openProbe;
     private readonly Func<Task> _refreshUsage;
@@ -176,6 +177,7 @@ public sealed partial class TrayDetailWindow : Window
 
         var nextX = _dragStartWindow.Left + cursor.X - _dragStartCursor.X;
         var nextY = _dragStartWindow.Top + cursor.Y - _dragStartCursor.Y;
+        SnapToEdges(ref nextX, ref nextY);
         AppWindow.Move(new Windows.Graphics.PointInt32(nextX, nextY));
         e.Handled = true;
     }
@@ -199,7 +201,62 @@ public sealed partial class TrayDetailWindow : Window
 
         _isDragging = false;
         DragSurface.ReleasePointerCapture(e.Pointer);
+        ApplyEdgeSnap();
         e.Handled = true;
+    }
+
+    private void ApplyEdgeSnap()
+    {
+        if (!GetWindowRect(_windowHandle, out var win))
+        {
+            return;
+        }
+
+        var x = win.Left;
+        var y = win.Top;
+        SnapToEdges(ref x, ref y, win.Right - win.Left, win.Bottom - win.Top);
+        if (x != win.Left || y != win.Top)
+        {
+            AppWindow.Move(new Windows.Graphics.PointInt32(x, y));
+        }
+    }
+
+    private void SnapToEdges(ref int x, ref int y)
+    {
+        if (!GetWindowRect(_windowHandle, out var win))
+        {
+            return;
+        }
+
+        SnapToEdges(ref x, ref y, win.Right - win.Left, win.Bottom - win.Top);
+    }
+
+    private void SnapToEdges(ref int x, ref int y, int windowWidth, int windowHeight)
+    {
+        var center = new Point
+        {
+            X = x + windowWidth / 2,
+            Y = y + windowHeight / 2,
+        };
+        var work = GetWorkArea(center);
+
+        if (Math.Abs(x - work.Left) <= EdgeSnapThreshold)
+        {
+            x = work.Left;
+        }
+        else if (Math.Abs(x + windowWidth - work.Right) <= EdgeSnapThreshold)
+        {
+            x = work.Right - windowWidth;
+        }
+
+        if (Math.Abs(y - work.Top) <= EdgeSnapThreshold)
+        {
+            y = work.Top;
+        }
+        else if (Math.Abs(y + windowHeight - work.Bottom) <= EdgeSnapThreshold)
+        {
+            y = work.Bottom - windowHeight;
+        }
     }
 
     private static bool IsInteractiveControl(DependencyObject? element)
