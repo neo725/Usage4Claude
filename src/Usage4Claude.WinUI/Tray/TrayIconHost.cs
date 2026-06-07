@@ -10,6 +10,7 @@ internal sealed class TrayIconHost : IDisposable
     private const uint TrayIconId = 1;
     private const uint CallbackMessage = 0x8001;
     private const uint LeftButtonUp = 0x0202;
+    private const uint LeftButtonDoubleClick = 0x0203;
     private const uint RightButtonUp = 0x0205;
 
     private readonly Window _window;
@@ -102,6 +103,9 @@ internal sealed class TrayIconHost : IDisposable
             {
                 case LeftButtonUp:
                     _window.DispatcherQueue.TryEnqueue(() => _toggleWindow());
+                    return nint.Zero;
+                case LeftButtonDoubleClick:
+                    _window.DispatcherQueue.TryEnqueue(() => _showSettings());
                     return nint.Zero;
                 case RightButtonUp:
                     _window.DispatcherQueue.TryEnqueue(ShowContextMenu);
