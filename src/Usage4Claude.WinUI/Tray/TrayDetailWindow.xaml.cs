@@ -15,6 +15,8 @@ public sealed partial class TrayDetailWindow : Window
 {
     private const int DetailWindowWidth = 348;
     private const int DetailWindowHeight = 395;
+    private const int MiniModeWidth = 220;
+    private const int MiniModeHeight = 36;
     private const int EdgeMargin = 12;
     private const int EdgeSnapThreshold = 15;
 
@@ -25,6 +27,8 @@ public sealed partial class TrayDetailWindow : Window
     private DisplaySettings _displaySettings = DisplaySettings.Default;
     private UsageState? _lastUsageState;
     private ProviderSessionState _lastSessionState = ProviderSessionState.Empty;
+    private readonly DispatcherTimer _miniModeTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private bool _isMiniMode;
     private bool _isTopMost;
     private bool _isDragging;
     private bool _syncingProgressMode;
@@ -58,6 +62,8 @@ public sealed partial class TrayDetailWindow : Window
         {
             SetWindowTopMost(true, showWindow: false);
         }
+
+        _miniModeTimer.Tick += MiniModeTimer_Tick;
     }
 
     private void OpenProbe_Click(object sender, RoutedEventArgs e)
@@ -86,11 +92,15 @@ public sealed partial class TrayDetailWindow : Window
 
     public void HideDetail()
     {
+        _miniModeTimer.Stop();
+        ResetMiniModeState();
         AppWindow.Hide();
     }
 
     public void ShowNearCursor()
     {
+        _miniModeTimer.Stop();
+        ResetMiniModeState();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
         AppWindow.Move(GetCursorAnchoredPosition());
         AppWindow.Show();
@@ -150,6 +160,7 @@ public sealed partial class TrayDetailWindow : Window
 
     private void DragSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        _miniModeTimer.Stop();
         if (e.GetCurrentPoint(DragSurface).Properties.IsLeftButtonPressed &&
             !IsInteractiveControl(e.OriginalSource as DependencyObject) &&
             GetCursorPos(out _dragStartCursor) &&
@@ -202,6 +213,12 @@ public sealed partial class TrayDetailWindow : Window
         _isDragging = false;
         DragSurface.ReleasePointerCapture(e.Pointer);
         ApplyEdgeSnap();
+
+        if (IsSnappedToEdge())
+        {
+            _miniModeTimer.Start();
+        }
+
         e.Handled = true;
     }
 
@@ -257,6 +274,139 @@ public sealed partial class TrayDetailWindow : Window
         {
             y = work.Bottom - windowHeight;
         }
+    }
+
+    private bool IsSnappedToEdge()
+    {
+        if (!GetWindowRect(_windowHandle, out var win))
+        {
+            return false;
+        }
+
+        var center = new Point
+        {
+            X = (win.Left + win.Right) / 2,
+            Y = (win.Top + win.Bottom) / 2,
+        };
+        var work = GetWorkArea(center);
+        return win.Left == work.Left || win.Right == work.Right ||
+               win.Top == work.Top || win.Bottom == work.Bottom;
+    }
+
+    private void MiniModeTimer_Tick(object? sender, object e)
+    {
+        _miniModeTimer.Stop();
+        EnterMiniMode();
+    }
+
+    private void DragSurface_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (_isMiniMode)
+        {
+            ExitMiniMode();
+            e.Handled = true;
+        }
+    }
+
+    private void EnterMiniMode()
+    {
+        _isMiniMode = true;
+        MainHeader.Visibility = Visibility.Collapsed;
+        MainScrollViewer.Visibility = Visibility.Collapsed;
+        MiniModePanel.Visibility = Visibility.Visible;
+        UpdateMiniBar();
+
+        // Use GetWindowRect (Win32) — same coordinate space as SetWindowPos and MonitorInfo.
+        if (!GetWindowRect(_windowHandle, out var win))
+        {
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(MiniModeWidth, MiniModeHeight));
+            return;
+        }
+
+        var work = GetCurrentWindowWorkArea();
+        var x = win.Right  == work.Right  ? work.Right  - MiniModeWidth  : win.Left;
+        var y = win.Bottom == work.Bottom ? work.Bottom - MiniModeHeight : win.Top;
+
+        ResizeAndMoveTo(x, y, MiniModeWidth, MiniModeHeight);
+    }
+
+    private void ExitMiniMode()
+    {
+        _isMiniMode = false;
+        _miniModeTimer.Stop();
+        MiniModePanel.Visibility = Visibility.Collapsed;
+        MainHeader.Visibility = Visibility.Visible;
+        MainScrollViewer.Visibility = Visibility.Visible;
+
+        // Use GetWindowRect (Win32) for current position — direct API, no caching,
+        // same coordinate space as SetWindowPos and MonitorInfo.WorkArea.
+        if (!GetWindowRect(_windowHandle, out var win))
+        {
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
+            return;
+        }
+
+        var work = GetCurrentWindowWorkArea();
+        var x = win.Left;
+        var y = win.Top;
+
+        // Clamp each edge of the restored window to fit within the work area.
+        if (x + DetailWindowWidth  > work.Right)  x = work.Right  - DetailWindowWidth;
+        if (y + DetailWindowHeight > work.Bottom) y = work.Bottom - DetailWindowHeight;
+        if (x < work.Left) x = work.Left;
+        if (y < work.Top)  y = work.Top;
+
+        ResizeAndMoveTo(x, y, DetailWindowWidth, DetailWindowHeight);
+    }
+
+    /// <summary>
+    /// Moves and resizes the window in a single atomic SetWindowPos call,
+    /// preserving Z-order (including topmost state).
+    /// </summary>
+    private void ResizeAndMoveTo(int x, int y, int width, int height)
+    {
+        SetWindowPos(
+            _windowHandle,
+            IntPtr.Zero,
+            x, y, width, height,
+            SetWindowPosFlags.ShowWindow | SetWindowPosFlags.NoZOrder);
+    }
+
+    /// <summary>
+    /// Gets the work area of the monitor that currently contains this window,
+    /// using MonitorFromWindow for correct multi-monitor support.
+    /// </summary>
+    private Rect GetCurrentWindowWorkArea()
+    {
+        var monitor = MonitorFromWindow(_windowHandle, MonitorDefaultToNearest);
+        var monitorInfo = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+        return GetMonitorInfo(monitor, ref monitorInfo)
+            ? monitorInfo.WorkArea
+            : new Rect { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
+    }
+
+    private void ResetMiniModeState()
+    {
+        if (!_isMiniMode)
+        {
+            return;
+        }
+
+        _isMiniMode = false;
+        MiniModePanel.Visibility = Visibility.Collapsed;
+        MainHeader.Visibility = Visibility.Visible;
+        MainScrollViewer.Visibility = Visibility.Visible;
+        // Window size will be corrected by the caller (ShowNearCursor / HideDetail)
+    }
+
+    private void UpdateMiniBar()
+    {
+        var fiveHour = _lastUsageState?.Claude?.FiveHour;
+        var sevenDay = _lastUsageState?.Claude?.SevenDay;
+        var percentage = fiveHour?.Percentage ?? sevenDay?.Percentage ?? 0;
+        var remaining = Math.Max(0, 100 - percentage);
+        MiniProgressBar.Value = remaining;
+        MiniPercentText.Text = $"{remaining:0.#}%";
     }
 
     private static bool IsInteractiveControl(DependencyObject? element)
@@ -343,6 +493,7 @@ public sealed partial class TrayDetailWindow : Window
 
         UpdateClaude(_lastUsageState.Claude, _lastSessionState.Claude);
         UpdateCodex(_lastUsageState.Codex, _lastSessionState.HasCodex);
+        UpdateMiniBar();
     }
 
     internal void UpdateDisplaySettings(DisplaySettings displaySettings)
@@ -539,6 +690,7 @@ public sealed partial class TrayDetailWindow : Window
     {
         NoSize = 0x0001,
         NoMove = 0x0002,
+        NoZOrder = 0x0004,
         ShowWindow = 0x0040,
     }
 
@@ -591,4 +743,7 @@ public sealed partial class TrayDetailWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool GetWindowRect(nint windowHandle, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint hwnd, uint flags);
 }
