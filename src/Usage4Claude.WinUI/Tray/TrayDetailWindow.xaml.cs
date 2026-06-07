@@ -45,6 +45,8 @@ public sealed partial class TrayDetailWindow : Window
         _refreshUsage = refreshUsage;
         _onProgressBarModeChanged = onProgressBarModeChanged;
         _windowHandle = WindowNative.GetWindowHandle(this);
+        var exStyle = GetWindowLongPtr(_windowHandle, GWL_EXSTYLE);
+        SetWindowLongPtr(_windowHandle, GWL_EXSTYLE, exStyle | (nint)WS_EX_TOOLWINDOW);
         AppWindow.SetIcon(iconPath);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(DetailWindowWidth, DetailWindowHeight));
 
@@ -682,6 +684,8 @@ public sealed partial class TrayDetailWindow : Window
     }
 
     private const uint MonitorDefaultToNearest = 0x00000002;
+    private const uint WS_EX_TOOLWINDOW = 0x00000080;
+    private const int GWL_EXSTYLE = -20;
     private static readonly nint TopMostWindow = new(-1);
     private static readonly nint NotTopMostWindow = new(-2);
 
@@ -746,4 +750,10 @@ public sealed partial class TrayDetailWindow : Window
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint flags);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern nint GetWindowLongPtr(nint hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern nint SetWindowLongPtr(nint hwnd, int index, nint newLong);
 }

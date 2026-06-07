@@ -996,8 +996,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowProbeWindow()
     {
-        AppWindow.Show();
-        Activate();
+        _trayIconHost.ShowMainWindow();
     }
 
     private void QuitFromTray()
