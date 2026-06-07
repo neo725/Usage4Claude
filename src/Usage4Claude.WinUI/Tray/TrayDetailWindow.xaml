@@ -6,36 +6,44 @@
     Title="Usage4Claude Detail">
     <Grid x:Name="DragSurface"
           Padding="14"
-          Width="336"
+          RowSpacing="10"
           Background="Transparent"
+          DoubleTapped="DragSurface_DoubleTapped"
           PointerCanceled="DragSurface_PointerDragEnded"
           PointerCaptureLost="DragSurface_PointerCaptureLost"
           PointerMoved="DragSurface_PointerMoved"
           PointerPressed="DragSurface_PointerPressed"
           PointerReleased="DragSurface_PointerDragEnded">
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="MainHeader" Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2">
+                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Usage4Claude" />
+                <TextBlock x:Name="UpdatedAtText"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Text="Sign in and refresh usage" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="RefreshButton"
+                        Content="Refresh"
+                        Click="RefreshUsage_Click" />
+                <Button Content="Open"
+                        Click="OpenProbe_Click" />
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer x:Name="MainScrollViewer"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="10">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Usage4Claude" />
-                        <TextBlock x:Name="UpdatedAtText"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   Text="Sign in and refresh usage" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                        <Button x:Name="RefreshButton"
-                                Content="Refresh"
-                                Click="RefreshUsage_Click" />
-                        <Button Content="Open"
-                                Click="OpenProbe_Click" />
-                    </StackPanel>
-                </Grid>
-
                 <Border Padding="10"
                         CornerRadius="6"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
@@ -58,7 +66,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -84,7 +92,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -105,7 +113,7 @@
                                 </Grid>
                                 <Grid x:Name="ClaudeExtraRow" ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="72" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -127,7 +135,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -153,7 +161,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -196,7 +204,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -222,7 +230,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
@@ -254,6 +262,18 @@
                     </Grid>
                 </Border>
 
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <RadioButton x:Name="UsageModeRadio"
+                                 Content="Usage"
+                                 GroupName="ProgressMode"
+                                 IsChecked="True"
+                                 Checked="ProgressMode_Changed" />
+                    <RadioButton x:Name="TimeModeRadio"
+                                 Content="Time elapsed"
+                                 GroupName="ProgressMode"
+                                 Checked="ProgressMode_Changed" />
+                </StackPanel>
+
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -270,5 +290,32 @@
                 </Grid>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Mini mode overlay — shown after 5s when snapped to a screen edge -->
+        <Border x:Name="MiniModePanel"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Visibility="Collapsed"
+                Margin="-14"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                CornerRadius="8"
+                Padding="10,0">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ProgressBar x:Name="MiniProgressBar"
+                             Maximum="100"
+                             Height="6"
+                             Foreground="#FF4CAF50"
+                             VerticalAlignment="Center" />
+                <TextBlock x:Name="MiniPercentText"
+                           Grid.Column="1"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
     </Grid>
 </Window>

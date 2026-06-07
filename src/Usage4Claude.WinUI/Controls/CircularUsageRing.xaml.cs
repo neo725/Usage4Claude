@@ -4,17 +4,25 @@ using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.UI;
 
 namespace Usage4Claude.WinUI.Controls;
 
 public sealed partial class CircularUsageRing : UserControl
 {
-    private const float OuterStrokeWidth = 8f;
+    private const float OuterStrokeWidth = 6f;
     private const float InnerStrokeWidth = 12f;
     private const float OuterRadius = 50f;
     private const float InnerRadius = 36f;
     private const float StartAngle = -(float)(Math.PI / 2);
+
+    private const double OuterRingHitMin = OuterRadius - OuterStrokeWidth / 2f; // 47
+    private const double OuterRingHitMax = OuterRadius + OuterStrokeWidth / 2f; // 53
+    private const double InnerRingHitMin = InnerRadius - InnerStrokeWidth / 2f; // 30
+    private const double InnerRingHitMax = InnerRadius + InnerStrokeWidth / 2f; // 42
+    private const double RingCenterX = 60.0;
+    private const double RingCenterY = 60.0;
 
     private static readonly Color TrackColor = Color.FromArgb(40, 128, 128, 128);
     private static readonly Color PrimaryColor = Color.FromArgb(255, 76, 175, 80);     // green
@@ -50,7 +58,7 @@ public sealed partial class CircularUsageRing : UserControl
     {
         if (d is CircularUsageRing ring)
         {
-            ring.PrimaryPercentText.Text = $"{ring.PrimaryPercentage:0.#}%";
+            ring.PrimaryPercentText.Text = $"{100 - ring.PrimaryPercentage:0.#}%";
             ring.RingCanvas.Invalidate();
         }
     }
@@ -58,6 +66,37 @@ public sealed partial class CircularUsageRing : UserControl
     public CircularUsageRing()
     {
         InitializeComponent();
+    }
+
+    private void RingCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        var pos = e.GetCurrentPoint(RingCanvas).Position;
+        var dx = pos.X - RingCenterX;
+        var dy = pos.Y - RingCenterY;
+        var dist = Math.Sqrt(dx * dx + dy * dy);
+
+        string? text = null;
+        if (dist >= OuterRingHitMin && dist <= OuterRingHitMax)
+            text = $"7-day {SecondaryPercentage:0.#}% used";
+        else if (dist >= InnerRingHitMin && dist <= InnerRingHitMax)
+            text = $"5-hour {PrimaryPercentage:0.#}% used";
+
+        if (text != null)
+        {
+            RingTooltipText.Text = text;
+            RingTooltipPopup.HorizontalOffset = pos.X + 14;
+            RingTooltipPopup.VerticalOffset = pos.Y - 28;
+            RingTooltipPopup.IsOpen = true;
+        }
+        else
+        {
+            RingTooltipPopup.IsOpen = false;
+        }
+    }
+
+    private void RingCanvas_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        RingTooltipPopup.IsOpen = false;
     }
 
     private void RingCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -71,13 +110,13 @@ public sealed partial class CircularUsageRing : UserControl
             EndCap = CanvasCapStyle.Round,
         };
 
-        // Outer ring — 7-day (secondary), purple
+        // Outer ring — 7-day (secondary), purple — arc shows remaining
         ds.DrawCircle(center, OuterRadius, TrackColor, OuterStrokeWidth);
-        DrawArcGeometry(ds, sender, center, OuterRadius, SecondaryPercentage, SecondaryColor, OuterStrokeWidth, strokeStyle);
+        DrawArcGeometry(ds, sender, center, OuterRadius, 100 - SecondaryPercentage, SecondaryColor, OuterStrokeWidth, strokeStyle);
 
-        // Inner ring — 5-hour (primary), green
+        // Inner ring — 5-hour (primary), green — arc shows remaining
         ds.DrawCircle(center, InnerRadius, TrackColor, InnerStrokeWidth);
-        DrawArcGeometry(ds, sender, center, InnerRadius, PrimaryPercentage, PrimaryColor, InnerStrokeWidth, strokeStyle);
+        DrawArcGeometry(ds, sender, center, InnerRadius, 100 - PrimaryPercentage, PrimaryColor, InnerStrokeWidth, strokeStyle);
     }
 
     private static void DrawArcGeometry(

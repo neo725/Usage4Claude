@@ -9,7 +9,14 @@ internal sealed class TrayIconHost : IDisposable
 {
     private const uint TrayIconId = 1;
     private const uint CallbackMessage = 0x8001;
+    private const uint WM_SYSCOMMAND = 0x0112;
+    private const uint SC_MINIMIZE = 0xF020;
+    private const uint SC_MASK = 0xFFF0;
+    private const uint WM_SIZE = 0x0005;
+    private const uint SizeMinimized = 1;
+    private const uint WS_EX_TOOLWINDOW = 0x00000080;
     private const uint LeftButtonUp = 0x0202;
+    private const uint LeftButtonDoubleClick = 0x0203;
     private const uint RightButtonUp = 0x0205;
 
     private readonly Window _window;
@@ -94,6 +101,17 @@ internal sealed class TrayIconHost : IDisposable
 
     private nint WindowProcedure(nint windowHandle, uint message, nint wParam, nint lParam)
     {
+        if (message == WM_SYSCOMMAND && ((uint)wParam & SC_MASK) == SC_MINIMIZE)
+        {
+            _window.DispatcherQueue.TryEnqueue(HideWindowFromTaskbar);
+            return nint.Zero;
+        }
+
+        if (message == WM_SIZE && (uint)wParam == SizeMinimized)
+        {
+            _window.DispatcherQueue.TryEnqueue(HideWindowFromTaskbar);
+        }
+
         if (message == CallbackMessage)
         {
             // NOTIFYICON_VERSION_4 packs the notification code into LOWORD(lParam).
@@ -103,6 +121,9 @@ internal sealed class TrayIconHost : IDisposable
                 case LeftButtonUp:
                     _window.DispatcherQueue.TryEnqueue(() => _toggleWindow());
                     return nint.Zero;
+                case LeftButtonDoubleClick:
+                    _window.DispatcherQueue.TryEnqueue(() => _showSettings());
+                    return nint.Zero;
                 case RightButtonUp:
                     _window.DispatcherQueue.TryEnqueue(ShowContextMenu);
                     return nint.Zero;
@@ -110,6 +131,21 @@ internal sealed class TrayIconHost : IDisposable
         }
 
         return CallWindowProc(_previousWndProc, windowHandle, message, wParam, lParam);
+    }
+
+    private void HideWindowFromTaskbar()
+    {
+        var exStyle = GetWindowLongPtr(_windowHandle, WindowLongIndex.ExStyle);
+        SetWindowLongPtr(_windowHandle, WindowLongIndex.ExStyle, exStyle | (nint)WS_EX_TOOLWINDOW);
+        _window.AppWindow.Hide();
+    }
+
+    public void ShowMainWindow()
+    {
+        var exStyle = GetWindowLongPtr(_windowHandle, WindowLongIndex.ExStyle);
+        SetWindowLongPtr(_windowHandle, WindowLongIndex.ExStyle, exStyle & ~(nint)WS_EX_TOOLWINDOW);
+        _window.AppWindow.Show();
+        _window.Activate();
     }
 
     private static uint LowWord(nint value) => (uint)(value.ToInt64() & 0xFFFF);
@@ -314,6 +350,7 @@ internal sealed class TrayIconHost : IDisposable
     private enum WindowLongIndex
     {
         WndProc = -4,
+        ExStyle = -20,
     }
 
     private enum ImageType : uint
@@ -343,6 +380,9 @@ internal sealed class TrayIconHost : IDisposable
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool Shell_NotifyIcon(NotifyIconMessage message, ref NotifyIconData data);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern nint GetWindowLongPtr(nint windowHandle, WindowLongIndex index);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
     private static extern nint SetWindowLongPtr(nint windowHandle, WindowLongIndex index, nint newLong);

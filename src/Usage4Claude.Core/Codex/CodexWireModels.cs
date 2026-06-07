@@ -73,7 +73,11 @@ public sealed class CodexWindowResponse
                 ? now.AddSeconds(ResetAfterSeconds.Value)
                 : null;
 
-        return new UsageLimit(UsedPercent, resetsAt);
+        var windowDuration = ResetAfterSeconds is not null
+            ? TimeSpan.FromSeconds(ResetAfterSeconds.Value)
+            : (TimeSpan?)null;
+
+        return new UsageLimit(UsedPercent, resetsAt, windowDuration);
     }
 }
 

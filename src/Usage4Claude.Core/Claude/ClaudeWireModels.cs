@@ -36,8 +36,8 @@ public sealed class ClaudeUsageResponse
 
     public ClaudeUsageSnapshot ToSnapshot(ClaudeExtraUsageSnapshot? extraUsage = null) =>
         new(
-            FiveHour.ToUsageLimit(),
-            SevenDay?.ToUsageLimit() ?? new UsageLimit(0, null),
+            FiveHour.ToUsageLimit(TimeSpan.FromHours(5)),
+            SevenDay?.ToUsageLimit(TimeSpan.FromDays(7)) ?? new UsageLimit(0, null, null),
             ToOptionalModelLimit(OpusWeekly),
             ToOptionalModelLimit(SonnetWeekly),
             extraUsage);
@@ -45,7 +45,7 @@ public sealed class ClaudeUsageResponse
     private static UsageLimit? ToOptionalModelLimit(ClaudeLimitResponse? value) =>
         value is null || value.Utilization == 0 && value.ResetsAt is null
             ? null
-            : value.ToUsageLimit();
+            : value.ToUsageLimit(TimeSpan.FromDays(7));
 }
 
 public sealed class ClaudeLimitResponse
@@ -56,7 +56,8 @@ public sealed class ClaudeLimitResponse
     [JsonPropertyName("resets_at")]
     public DateTimeOffset? ResetsAt { get; init; }
 
-    public UsageLimit ToUsageLimit() => new(Utilization, RoundToNearestSecond(ResetsAt));
+    public UsageLimit ToUsageLimit(TimeSpan? windowDuration = null) =>
+        new(Utilization, RoundToNearestSecond(ResetsAt), windowDuration);
 
     private static DateTimeOffset? RoundToNearestSecond(DateTimeOffset? value)
     {

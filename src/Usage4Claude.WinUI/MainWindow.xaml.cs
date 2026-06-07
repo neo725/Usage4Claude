@@ -28,6 +28,8 @@ public sealed partial class MainWindow : Window
     private readonly ProviderSessionStateStore _sessionState = new();
     private readonly DispatcherTimer _cookieTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _usageRefreshTimer = new();
+    private DispatcherTimer? _fiveHourResetTimer;
+    private DispatcherTimer? _sevenDayResetTimer;
     private readonly TrayDetailWindow _trayDetailWindow;
     private readonly TrayIconHost _trayIconHost;
     private readonly BrowserUsageRefreshService _browserRefresh;
@@ -63,7 +65,8 @@ public sealed partial class MainWindow : Window
             Usage4ClaudeIconPath,
             _preferences.TrayDetailTopMost,
             ShowProbeWindow,
-            RefreshCapturedUsageAsync);
+            RefreshCapturedUsageAsync,
+            OnProgressBarModeChanged);
         _trayIconHost = new TrayIconHost(
             this,
             Usage4ClaudeIconPath,
@@ -157,6 +160,13 @@ public sealed partial class MainWindow : Window
         RefreshTraySurfaces();
         _trayDetailWindow.ShowNearCursor();
         await RefreshCapturedUsageAsync(RefreshTrigger.DetailOpen);
+    }
+
+    private void OnProgressBarModeChanged(ProgressBarMode mode)
+    {
+        _displaySettings = _displaySettings with { ProgressBarMode = mode };
+        SavePreferences();
+        _trayDetailWindow.UpdateDisplaySettings(_displaySettings);
     }
 
     private void DisplaySettings_Changed(object sender, RoutedEventArgs e)
@@ -843,7 +853,8 @@ public sealed partial class MainWindow : Window
     }
 
     private static bool IsPolicyManagedRefresh(RefreshTrigger trigger) =>
-        trigger is RefreshTrigger.Startup or RefreshTrigger.Background or RefreshTrigger.DetailOpen or RefreshTrigger.CookieCapture or RefreshTrigger.Manual;
+        trigger is RefreshTrigger.Startup or RefreshTrigger.Background or RefreshTrigger.DetailOpen
+               or RefreshTrigger.CookieCapture or RefreshTrigger.Manual or RefreshTrigger.ResetTimer;
 
     private IEnumerable<LoginTarget> GetAvailableBrowserProviders()
     {
@@ -949,6 +960,8 @@ public sealed partial class MainWindow : Window
         SaveCurrentPreferencesFromUi();
         _cookieTimer.Stop();
         _usageRefreshTimer.Stop();
+        _fiveHourResetTimer?.Stop();
+        _sevenDayResetTimer?.Stop();
         _usageState.Changed -= UsageState_Changed;
         _sessionState.Changed -= SessionState_Changed;
         Activated -= MainWindow_Activated;
@@ -983,8 +996,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowProbeWindow()
     {
-        AppWindow.Show();
-        Activate();
+        _trayIconHost.ShowMainWindow();
     }
 
     private void QuitFromTray()
@@ -1001,6 +1013,53 @@ public sealed partial class MainWindow : Window
         _displaySettings = ReadDisplaySettings();
         RefreshTraySurfaces();
         RefreshMainSurface();
+        ScheduleResetRefreshes(state);
+    }
+
+    private void ScheduleResetRefreshes(UsageState state)
+    {
+        ScheduleResetTimer(ref _fiveHourResetTimer, state.Claude?.FiveHour?.ResetsAt);
+        ScheduleResetTimer(ref _sevenDayResetTimer, state.Claude?.SevenDay?.ResetsAt);
+    }
+
+    private void ScheduleResetTimer(ref DispatcherTimer? timer, DateTimeOffset? resetsAt)
+    {
+        if (timer is not null)
+        {
+            timer.Stop();
+            timer.Tick -= ResetTimer_Tick;
+            timer = null;
+        }
+
+        if (resetsAt is null)
+        {
+            return;
+        }
+
+        var delay = resetsAt.Value - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1);
+        if (delay <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        timer = new DispatcherTimer { Interval = delay };
+        timer.Tick += ResetTimer_Tick;
+        timer.Start();
+    }
+
+    private async void ResetTimer_Tick(object? sender, object e)
+    {
+        if (sender is DispatcherTimer t)
+        {
+            t.Stop();
+            t.Tick -= ResetTimer_Tick;
+        }
+
+        await RefreshCapturedUsageAsync(RefreshTrigger.ResetTimer);
+        if (GetAvailableBrowserProviders().Any())
+        {
+            ScheduleBackgroundRefresh();
+        }
     }
 
     private void SessionState_Changed(object? sender, ProviderSessionState state)
@@ -1098,7 +1157,8 @@ public sealed partial class MainWindow : Window
                 1 => AppAppearance.Light,
                 2 => AppAppearance.Dark,
                 _ => AppAppearance.System,
-            });
+            },
+            _displaySettings.ProgressBarMode);
 
         if (CustomDisplayPanel is not null)
         {
@@ -1697,6 +1757,7 @@ public sealed partial class MainWindow : Window
         CookieCapture,
         Manual,
         ManualProbe,
+        ResetTimer,
     }
 
 }

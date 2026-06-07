@@ -6,7 +6,9 @@
     <Grid Width="120" Height="120">
         <canvas:CanvasControl x:Name="RingCanvas"
                               ClearColor="Transparent"
-                              Draw="RingCanvas_Draw" />
+                              Draw="RingCanvas_Draw"
+                              PointerMoved="RingCanvas_PointerMoved"
+                              PointerExited="RingCanvas_PointerExited" />
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Spacing="1">
@@ -20,5 +22,14 @@
                        TextAlignment="Center"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
+        <Popup x:Name="RingTooltipPopup">
+            <Border Background="#B3FFFFFF"
+                    CornerRadius="6"
+                    Padding="8,5">
+                <TextBlock x:Name="RingTooltipText"
+                           FontSize="12"
+                           Foreground="Black" />
+            </Border>
+        </Popup>
     </Grid>
 </UserControl>

@@ -19,6 +19,12 @@ internal enum AppAppearance
     Dark,
 }
 
+internal enum ProgressBarMode
+{
+    Usage,
+    TimeElapsed,
+}
+
 internal sealed record DisplaySettings(
     DisplayMode DisplayMode,
     bool ShowFiveHour,
@@ -31,7 +37,8 @@ internal sealed record DisplaySettings(
     bool ShowCodexCredits,
     bool UseColoredTheme,
     DetailTimeMode DetailTimeMode,
-    AppAppearance Appearance)
+    AppAppearance Appearance,
+    ProgressBarMode ProgressBarMode = ProgressBarMode.Usage)
 {
     public static DisplaySettings Default { get; } = new(
         DisplayMode.Smart,
@@ -45,5 +52,6 @@ internal sealed record DisplaySettings(
         ShowCodexCredits: true,
         UseColoredTheme: false,
         DetailTimeMode: DetailTimeMode.ResetTime,
-        Appearance: AppAppearance.System);
+        Appearance: AppAppearance.System,
+        ProgressBarMode: ProgressBarMode.Usage);
 }

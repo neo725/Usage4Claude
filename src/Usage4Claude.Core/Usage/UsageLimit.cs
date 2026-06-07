@@ -1,3 +1,3 @@
 namespace Usage4Claude.Core.Usage;
 
-public sealed record UsageLimit(double Percentage, DateTimeOffset? ResetsAt);
+public sealed record UsageLimit(double Percentage, DateTimeOffset? ResetsAt, TimeSpan? WindowDuration = null);
