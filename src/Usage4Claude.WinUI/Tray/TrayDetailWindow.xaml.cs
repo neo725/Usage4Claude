@@ -14,9 +14,9 @@ namespace Usage4Claude.WinUI.Tray;
 public sealed partial class TrayDetailWindow : Window
 {
     private const int DetailWindowWidth = 348;
-    private const int DetailWindowHeight = 395;
+    private const int DetailWindowHeight = 407;
     private const int MiniModeWidth = 220;
-    private const int MiniModeHeight = 36;
+    private const int MiniModeHeight = 44;
     private const int EdgeMargin = 12;
     private const int EdgeSnapThreshold = 15;
 
@@ -28,6 +28,10 @@ public sealed partial class TrayDetailWindow : Window
     private UsageState? _lastUsageState;
     private ProviderSessionState _lastSessionState = ProviderSessionState.Empty;
     private readonly DispatcherTimer _miniModeTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private readonly DispatcherTimer _tickBreatheTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
+    private Border? _breathingTick;
+    private Border? _breathingMiniTick;
+    private DateTimeOffset _breatheStart;
     private bool _isMiniMode;
     private bool _isTopMost;
     private bool _isDragging;
@@ -66,6 +70,8 @@ public sealed partial class TrayDetailWindow : Window
         }
 
         _miniModeTimer.Tick += MiniModeTimer_Tick;
+        _tickBreatheTimer.Tick += TickBreatheTimer_Tick;
+        Closed += (_, _) => _tickBreatheTimer.Stop();
     }
 
     private void OpenProbe_Click(object sender, RoutedEventArgs e)
@@ -95,6 +101,7 @@ public sealed partial class TrayDetailWindow : Window
     public void HideDetail()
     {
         _miniModeTimer.Stop();
+        _tickBreatheTimer.Stop();
         ResetMiniModeState();
         AppWindow.Hide();
     }
@@ -409,6 +416,24 @@ public sealed partial class TrayDetailWindow : Window
         var remaining = Math.Max(0, 100 - percentage);
         MiniProgressBar.Value = remaining;
         MiniPercentText.Text = $"{remaining:0.#}%";
+        UpdateMiniTicks(fiveHour);
+    }
+
+    private void UpdateMiniTicks(UsageLimit? fiveHour)
+    {
+        var ticks = new[] { MiniTick1, MiniTick2, MiniTick3, MiniTick4, MiniTick5 };
+
+        var visibleCount = 0;
+        if (fiveHour?.ResetsAt is not null)
+        {
+            var hoursRemaining = (fiveHour.ResetsAt.Value - DateTimeOffset.UtcNow).TotalHours;
+            visibleCount = Math.Clamp((int)Math.Ceiling(hoursRemaining), 0, 5);
+        }
+
+        for (var i = 0; i < ticks.Length; i++)
+            ticks[i].Opacity = i < visibleCount ? 1.0 : 0.0;
+
+        _breathingMiniTick = visibleCount > 0 ? ticks[visibleCount - 1] : null;
     }
 
     private static bool IsInteractiveControl(DependencyObject? element)
@@ -515,12 +540,48 @@ public sealed partial class TrayDetailWindow : Window
         RenderState();
     }
 
+    private void UpdateFiveHourTicks(UsageLimit? fiveHour)
+    {
+        var ticks = new[] { FiveHourTick1, FiveHourTick2, FiveHourTick3, FiveHourTick4, FiveHourTick5 };
+
+        var visibleCount = 0;
+        if (fiveHour?.ResetsAt is not null)
+        {
+            var hoursRemaining = (fiveHour.ResetsAt.Value - DateTimeOffset.UtcNow).TotalHours;
+            visibleCount = Math.Clamp((int)Math.Ceiling(hoursRemaining), 0, 5);
+        }
+
+        for (var i = 0; i < ticks.Length; i++)
+            ticks[i].Opacity = i < visibleCount ? 1.0 : 0.0;
+
+        _tickBreatheTimer.Stop();
+        _breathingTick = null;
+
+        if (visibleCount > 0)
+        {
+            _breathingTick = ticks[visibleCount - 1];
+            _breatheStart = DateTimeOffset.UtcNow;
+            _tickBreatheTimer.Start();
+        }
+    }
+
+    private void TickBreatheTimer_Tick(object? sender, object e)
+    {
+        var elapsed = (DateTimeOffset.UtcNow - _breatheStart).TotalSeconds;
+        var opacity = 0.25 + 0.75 * (Math.Sin(elapsed * Math.PI) + 1.0) / 2.0;
+        if (_breathingTick is not null)
+            _breathingTick.Opacity = opacity;
+        if (_breathingMiniTick is not null)
+            _breathingMiniTick.Opacity = opacity;
+    }
+
     private void UpdateClaude(ClaudeUsageSnapshot? usage, ProviderSessionSource sessionSource)
     {
         ClaudeEmptyText.Visibility = usage is null ? Visibility.Visible : Visibility.Collapsed;
         ClaudeUsagePanel.Visibility = usage is null ? Visibility.Collapsed : Visibility.Visible;
         if (usage is null)
         {
+            UpdateFiveHourTicks(null);
             ClaudeEmptyText.Text = sessionSource switch
             {
                 ProviderSessionSource.WebViewCookie => "Waiting for browser refresh",
@@ -530,6 +591,7 @@ public sealed partial class TrayDetailWindow : Window
             return;
         }
 
+        UpdateFiveHourTicks(usage.FiveHour);
         ClaudeRing.PrimaryPercentage = usage.FiveHour?.Percentage ?? 0;
         ClaudeRing.SecondaryPercentage = usage.SevenDay?.Percentage ?? 0;
 
